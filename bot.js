@@ -116,7 +116,7 @@ client.on('interactionCreate', async (interaction) => {
         .setTitle('Auction System Setup')
         .setDescription('Welcome to the live auction system!\n\n**How it works:**\n- Auctions are held per channel to avoid conflicts.\n- Bidding can be done via text (e.g., "bid 10000") or slash commands.\n- The auction ends automatically after the set time, or can be ended early.\n- Winner is the highest bidder (diamonds first, then first bid if tie).\n\nClick the button below to create a new auction.')
         .setColor(0x00ff00)
-        .setFooter({ text: 'Versão 1.0.0 | Criado por Atlas' })
+        .setFooter({ text: 'Version 1.0.2 | Made By Atlas' })
         .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
       const row = new ActionRowBuilder()
@@ -143,7 +143,7 @@ client.on('interactionCreate', async (interaction) => {
         .setCustomId('diamonds')
         .setLabel('Diamonds (💎)')
         .setStyle(TextInputStyle.Short)
-        .setPlaceholder('10000 or 10K')
+        .setPlaceholder('10000')
         .setRequired(auction.model !== 'items');
 
       const itemsInput = new TextInputBuilder()
