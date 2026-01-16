@@ -569,9 +569,9 @@ client.on('interactionCreate', async (interaction) => {
 
       const userInput = new TextInputBuilder()
         .setCustomId('trade_target_user')
-        .setLabel('Target User (optional - leave empty for open trade)')
+        .setLabel('Target User (optional)')
         .setStyle(TextInputStyle.Short)
-        .setPlaceholder('Username or leave empty')
+        .setPlaceholder('Leave empty for open trade')
         .setRequired(false);
 
       const row1 = new ActionRowBuilder().addComponents(diamondsInput);
