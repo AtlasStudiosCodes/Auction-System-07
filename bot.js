@@ -7,6 +7,7 @@ const config = require('./config.json');
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
 
 let redirectChannelId = null;
+let redirectTradeChannelId = null;
 
 const auctions = new Map(); // channelId -> { host, title, description, model, time, startingPrice, bids: [{user, diamonds, items}], timer, started, channelId, messageId, updateInterval }
 const trades = new Map(); // messageId -> { host, hostDiamonds, hostItems, offers: [{user, diamonds, items, timestamp}], channelId, messageId, accepted: false, acceptedUser: null }
@@ -98,6 +99,18 @@ client.once('ready', async () => {
       name: 'setuptrade',
       description: 'Show trade setup information'
     },
+    {
+      name: 'redirecttrade',
+      description: 'Redirect all future trades to a specific channel (admin only)',
+      options: [
+        {
+          name: 'channel',
+          type: ApplicationCommandOptionType.Channel,
+          description: 'The channel to redirect trades to',
+          required: true
+        }
+      ]
+    },
   ];
 
   await client.application.commands.set(commands);
@@ -169,7 +182,7 @@ client.on('interactionCreate', async (interaction) => {
         .setTitle('Auction System Setup')
         .setDescription('Welcome to the live auction system!\n\n**How it works:**\n- Auctions are held per channel to avoid conflicts.\n- Bidding can be done via text (e.g., "bid 10000") or slash commands.\n- The auction ends automatically after the set time, or can be ended early.\n- Winner is the highest bidder (diamonds first, then first bid if tie).\n\nClick the button below to create a new auction.')
         .setColor(0x00ff00)
-        .setFooter({ text: 'Version 1.0.6 | Made By Atlas' })
+        .setFooter({ text: 'Version 1.0.8 | Made By Atlas' })
         .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
       const row = new ActionRowBuilder()
@@ -326,7 +339,7 @@ client.on('interactionCreate', async (interaction) => {
           .setTitle(auction.title)
           .setDescription(`${auction.description}\n\n**Looking For:** ${auction.model}\n**Starting Price:** ${formatBid(auction.startingPrice)} 💎\n**Current Bid:** ${formatBid(currentBid)} 💎\n**Time Remaining:** ${remaining}s\n**Hosted by:** ${auction.host}`)
           .setColor(0x00ff00)
-          .setFooter({ text: 'Version 1.0.6 | Made By Atlas' })
+          .setFooter({ text: 'Version 1.0.8 | Made By Atlas' })
           .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
         try {
           const channel = interaction.guild.channels.cache.get(auction.channelId);
@@ -350,12 +363,20 @@ client.on('interactionCreate', async (interaction) => {
       interaction.reply({ content: `All future auctions will be redirected to ${channel}.`, ephemeral: true });
     }
 
+    if (commandName === 'redirecttrade') {
+      if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+      const channel = interaction.options.getChannel('channel');
+      if (channel.type !== 0) return interaction.reply({ content: 'Please select a text channel.', ephemeral: true });
+      redirectTradeChannelId = channel.id;
+      interaction.reply({ content: `All future trades will be redirected to ${channel}.`, ephemeral: true });
+    }
+
     if (commandName === 'setuptrade') {
       const embed = new EmbedBuilder()
         .setTitle('Trade System Setup')
         .setDescription('Welcome to the live trade system!\n\n**How it works:**\n- Create a trade offer with items or diamonds.\n- Other users can place their offers in response.\n- Host can accept or decline offers.\n- Once accepted, both users are notified.\n\nClick the button below to create a new trade.')
         .setColor(0x0099ff)
-        .setFooter({ text: 'Version 1.0.6 | Made By Atlas' })
+        .setFooter({ text: 'Version 1.0.8 | Made By Atlas' })
         .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
       const row = new ActionRowBuilder()
@@ -423,7 +444,7 @@ client.on('interactionCreate', async (interaction) => {
         .setTitle('Bid List')
         .setDescription(bidList)
         .setColor(0x00ff00)
-        .setFooter({ text: 'Version 1.0.6 | Made By Atlas' })
+        .setFooter({ text: 'Version 1.0.8 | Made By Atlas' })
         .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
       interaction.reply({ embeds: [embed], ephemeral: true });
@@ -916,7 +937,7 @@ client.on('interactionCreate', async (interaction) => {
         .setTitle('Trade Offer')
         .setDescription(`**Host:** ${interaction.user}\n**Status:** Waiting for offers`)
         .setColor(0x0099ff)
-        .setFooter({ text: 'Version 1.0.6 | Made By Atlas' })
+        .setFooter({ text: 'Version 1.0.8 | Made By Atlas' })
         .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
       // Format host items with quantities
@@ -940,14 +961,15 @@ client.on('interactionCreate', async (interaction) => {
 
       const row = new ActionRowBuilder().addComponents(offerButton);
 
-      const message = await interaction.channel.send({ embeds: [embed], components: [row] });
+      const targetChannel = redirectTradeChannelId ? interaction.guild.channels.cache.get(redirectTradeChannelId) : interaction.channel;
+      const message = await targetChannel.send({ embeds: [embed], components: [row] });
 
       const trade = {
         host: interaction.user,
         hostDiamonds: diamonds,
         hostItems: hostItems,
         offers: [],
-        channelId: interaction.channel.id,
+        channelId: targetChannel.id,
         messageId: message.id,
         accepted: false,
         acceptedUser: null,
@@ -986,6 +1008,12 @@ client.on('interactionCreate', async (interaction) => {
 
       // Update trade embed to show grid layout
       await updateTradeEmbed(interaction.guild, trade, messageId);
+
+      // Notify host of new offer
+      const channel = interaction.guild.channels.cache.get(trade.channelId);
+      if (channel) {
+        await channel.send(`📢 ${trade.host}, você recebeu uma oferta de ${interaction.user}!`);
+      }
 
       await interaction.reply({ content: `Offer submitted! Host will accept or decline.`, flags: 64 });
       return;
@@ -1053,7 +1081,7 @@ client.on('interactionCreate', async (interaction) => {
         .setTitle(title)
         .setDescription(`${description}\n\n**Looking For:** ${model}\n**Starting Price:** ${formatBid(startingPrice)} 💎\n**Current Bid:** ${formatBid(startingPrice)} 💎\n**Time Remaining:** ${time}s\n**Hosted by:** ${interaction.user}`)
         .setColor(0x00ff00)
-        .setFooter({ text: 'Version 1.0.6 | Made By Atlas' })
+        .setFooter({ text: 'Version 1.0.8 | Made By Atlas' })
         .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
       const row = new ActionRowBuilder()
@@ -1093,7 +1121,7 @@ client.on('interactionCreate', async (interaction) => {
           .setTitle(auction.title)
           .setDescription(`${auction.description}\n\n**Looking For:** ${auction.model}\n**Starting Price:** ${formatBid(auction.startingPrice)} 💎\n**Current Bid:** ${formatBid(currentBid)} 💎\n**Time Remaining:** ${remaining}s\n**Hosted by:** ${auction.host}`)
           .setColor(0x00ff00)
-          .setFooter({ text: 'Version 1.0.6 | Made By Atlas' })
+          .setFooter({ text: 'Version 1.0.8 | Made By Atlas' })
           .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
         try {
           await message.edit({ embeds: [updatedEmbed], components: [row] });
@@ -1119,7 +1147,7 @@ async function updateTradeEmbed(guild, trade, messageId) {
     const embed = new EmbedBuilder()
       .setTitle('Trade Offer')
       .setColor(trade.accepted ? 0x00ff00 : 0x0099ff)
-      .setFooter({ text: 'Version 1.0.6 | Made By Atlas' })
+      .setFooter({ text: 'Version 1.0.8 | Made By Atlas' })
       .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
     if (trade.accepted) {
