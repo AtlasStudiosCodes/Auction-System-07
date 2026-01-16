@@ -1822,7 +1822,7 @@ client.on('interactionCreate', async (interaction) => {
       }
       
       embed.addFields({
-        name: `Host Items${diamonds > 0 ? ` + ${diamonds} 💎` : ''}`,
+        name: `Host Items${diamonds > 0 ? ` + ${formatBid(diamonds)} 💎` : ''}`,
         value: hostItemsText || 'None',
         inline: false
       });
@@ -1894,7 +1894,7 @@ client.on('interactionCreate', async (interaction) => {
       // Notify host of new offer
       const channel = interaction.guild.channels.cache.get(trade.channelId);
       if (channel) {
-        await channel.send(`📢 ${trade.host}, você recebeu uma oferta de ${interaction.user}!`);
+        await channel.send(`📢 ${trade.host}, you received an offer of ${interaction.user}!`);
       }
 
       await interaction.reply({ content: `Offer submitted! Host will accept or decline.`, flags: 64 });
@@ -2048,7 +2048,7 @@ async function updateTradeEmbed(guild, trade, messageId) {
       typeof item === 'object' ? `${item.name} x${item.quantity}` : item
     ).join('\n') : 'None';
     embed.addFields({
-      name: `Host${trade.hostDiamonds > 0 ? ` (+ ${trade.hostDiamonds} 💎)` : ''}`,
+      name: `Host${trade.hostDiamonds > 0 ? ` (+ ${formatBid(trade.hostDiamonds)} 💎)` : ''}`,
       value: hostItemsText || 'None',
       inline: true
     });
@@ -2059,7 +2059,7 @@ async function updateTradeEmbed(guild, trade, messageId) {
         typeof item === 'object' ? `${item.name} x${item.quantity}` : item
       ).join('\n') : 'None';
       embed.addFields({
-        name: `${lastOffer.user.username}${lastOffer.diamonds > 0 ? ` (+ ${lastOffer.diamonds} 💎)` : ''}`,
+        name: `${lastOffer.user.username}${lastOffer.diamonds > 0 ? ` (+ ${formatBid(lastOffer.diamonds)} 💎)` : ''}`,
         value: guestItemsText || 'None',
         inline: true
       });
@@ -2070,7 +2070,7 @@ async function updateTradeEmbed(guild, trade, messageId) {
           typeof item === 'object' ? `${item.name} x${item.quantity}` : item
         ).join('\n') : 'None';
         embed.addFields({
-          name: `${acceptedOffer.user.username}${acceptedOffer.diamonds > 0 ? ` (+ ${acceptedOffer.diamonds} 💎)` : ''}`,
+          name: `${acceptedOffer.user.username}${acceptedOffer.diamonds > 0 ? ` (+ ${formatBid(acceptedOffer.diamonds)} 💎)` : ''}`,
           value: guestItemsText || 'None',
           inline: true
         });
