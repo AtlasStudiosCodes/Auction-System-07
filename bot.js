@@ -67,6 +67,14 @@ client.once('ready', async () => {
         }
       ]
     },
+    {
+      name: 'endchanneladmin',
+      description: 'End the auction in this channel (admin only)'
+    },
+    {
+      name: 'deletechanneladmin',
+      description: 'Delete the auction in this channel (admin only)'
+    },
   ];
 
   await client.application.commands.set(commands);
@@ -196,14 +204,18 @@ client.on('interactionCreate', async (interaction) => {
       const auction = Array.from(auctions.values()).find(a => a.messageId === messageId);
       if (!auction) return interaction.reply({ content: 'Auction not found.', ephemeral: true });
 
+      clearTimeout(auction.timer);
+      clearInterval(auction.updateInterval);
+      
       try {
-        const message = await interaction.channel.messages.fetch(messageId);
+        const channel = interaction.guild.channels.cache.get(auction.channelId);
+        const message = await channel.messages.fetch(messageId);
         await message.delete();
       } catch (e) {
         // ignore if message not found
       }
       auctions.delete(auction.channelId);
-      interaction.reply({ content: 'Auction deleted.', ephemeral: true });
+      interaction.reply({ content: `Auction "${auction.title}" (from ${auction.host}) deleted by admin.`, ephemeral: true });
     }
 
     if (commandName === 'endauctionadmin') {
@@ -214,8 +226,38 @@ client.on('interactionCreate', async (interaction) => {
 
       clearTimeout(auction.timer);
       clearInterval(auction.updateInterval);
-      await endAuction(interaction.guild.channels.cache.get(auction.channelId));
-      interaction.reply({ content: 'Auction ended.', ephemeral: true });
+      const channel = interaction.guild.channels.cache.get(auction.channelId);
+      await endAuction(channel);
+      interaction.reply({ content: `Auction "${auction.title}" (from ${auction.host}) ended by admin.`, ephemeral: true });
+    }
+
+    if (commandName === 'endchanneladmin') {
+      if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+      const auction = Array.from(auctions.values()).find(a => a.channelId === interaction.channel.id);
+      if (!auction) return interaction.reply({ content: 'No auction running in this channel.', ephemeral: true });
+
+      clearTimeout(auction.timer);
+      clearInterval(auction.updateInterval);
+      await endAuction(interaction.channel);
+      interaction.reply({ content: `Auction "${auction.title}" (from ${auction.host}) ended by admin.`, ephemeral: true });
+    }
+
+    if (commandName === 'deletechanneladmin') {
+      if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+      const auction = Array.from(auctions.values()).find(a => a.channelId === interaction.channel.id);
+      if (!auction) return interaction.reply({ content: 'No auction running in this channel.', ephemeral: true });
+
+      clearTimeout(auction.timer);
+      clearInterval(auction.updateInterval);
+      
+      try {
+        const message = await interaction.channel.messages.fetch(auction.messageId);
+        await message.delete();
+      } catch (e) {
+        // ignore if message not found
+      }
+      auctions.delete(interaction.channel.id);
+      interaction.reply({ content: `Auction "${auction.title}" (from ${auction.host}) deleted by admin.`, ephemeral: true });
     }
 
     if (commandName === 'restartauction') {
@@ -462,6 +504,7 @@ client.on('interactionCreate', async (interaction) => {
           clearInterval(auction.updateInterval);
           return;
         }
+        const currentBid = auction.bids.length > 0 ? Math.max(...auction.bids.map(b => b.diamonds)) : auction.startingPrice;
         const updatedEmbed = new EmbedBuilder()
           .setTitle(auction.title)
           .setDescription(`${auction.description}\n\n**Looking For:** ${auction.model}\n**Starting Price:** ${auction.startingPrice} 💎\n**Current Bid:** ${currentBid} 💎\n**Time Remaining:** ${remaining}s\n**Hosted by:** ${auction.host}`)
