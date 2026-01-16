@@ -1,3 +1,6 @@
+const { ReadableStream } = require('web-streams-polyfill');
+global.ReadableStream = ReadableStream;
+
 const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, ApplicationCommandOptionType } = require('discord.js');
 const config = require('./config.json');
 

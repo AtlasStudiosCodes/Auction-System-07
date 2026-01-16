@@ -21,6 +21,14 @@ A Discord bot for live auctions with support for bidding using diamonds (💎) a
 5. Invite the bot to your server with appropriate permissions (Send Messages, Use Slash Commands, etc.)
 6. Run the bot: `npm start`
 
+<<<<<<< HEAD
+=======
+## Troubleshooting
+
+- **ReadableStream error**: If you encounter `ReferenceError: ReadableStream is not defined`, the polyfill is included. Re-deploy after `npm install` if needed.
+- **Token invalid**: Ensure your bot token is correct in `config.json`.
+
+>>>>>>> ddbe013 (Fix ReadableStream error by adding web-streams-polyfill)
 ## Configuration
 
 Edit `config.json`:
