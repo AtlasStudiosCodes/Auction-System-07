@@ -239,7 +239,10 @@ client.on('interactionCreate', async (interaction) => {
         try {
           const channel = interaction.guild.channels.cache.get(auction.channelId);
           const message = await channel.messages.fetch(auction.messageId);
-          await message.edit({ embeds: [updatedEmbed], components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('bid_button').setLabel('Bid').setStyle(ButtonStyle.Primary))] });
+          await message.edit({ embeds: [updatedEmbed], components: [new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('bid_button').setLabel('Bid').setStyle(ButtonStyle.Primary),
+            new ButtonBuilder().setCustomId('view_bids_button').setLabel('View Bids').setStyle(ButtonStyle.Secondary)
+          )] });
         } catch (e) {
           // ignore
         }
@@ -285,6 +288,32 @@ client.on('interactionCreate', async (interaction) => {
       modal.addComponents(row1, row2);
 
       await interaction.showModal(modal);
+    }
+
+    if (interaction.customId === 'view_bids_button') {
+      const auction = Array.from(auctions.values()).find(a => a.channelId === interaction.channel.id);
+      if (!auction) return interaction.reply({ content: 'No auction running.', ephemeral: true });
+
+      if (auction.bids.length === 0) return interaction.reply({ content: 'No bids yet.', ephemeral: true });
+
+      // Sort bids by diamonds descending
+      const sortedBids = auction.bids.sort((a, b) => b.diamonds - a.diamonds);
+
+      const bidList = sortedBids.map(bid => {
+        const secondsAgo = Math.floor((Date.now() - bid.timestamp) / 1000);
+        let timeAgo;
+        if (secondsAgo < 60) timeAgo = `${secondsAgo} segundos atrás`;
+        else if (secondsAgo < 3600) timeAgo = `${Math.floor(secondsAgo / 60)} minutos atrás`;
+        else timeAgo = `${Math.floor(secondsAgo / 3600)} horas atrás`;
+        return `${bid.user.username}: ${bid.diamonds} 💎 - ${timeAgo}`;
+      }).join('\n');
+
+      const embed = new EmbedBuilder()
+        .setTitle('Lista de Lances')
+        .setDescription(bidList)
+        .setColor(0x00ff00);
+
+      interaction.reply({ embeds: [embed], ephemeral: true });
     }
 
     if (interaction.customId === 'create_auction') {
@@ -352,7 +381,11 @@ client.on('interactionCreate', async (interaction) => {
       if (auction.model === 'diamonds' && diamonds === 0) return interaction.reply({ content: 'Please enter diamonds.', ephemeral: true });
       if (auction.model === 'items' && !items) return interaction.reply({ content: 'Please enter items.', ephemeral: true });
 
-      auction.bids.push({ user: interaction.user, diamonds, items });
+      // Check if bid is higher than current max
+      const maxBid = auction.bids.length > 0 ? Math.max(...auction.bids.map(b => b.diamonds)) : auction.startingPrice;
+      if (auction.model !== 'items' && diamonds <= maxBid) return interaction.reply({ content: `Your bid must be higher than the current highest bid of ${maxBid} 💎.`, ephemeral: true });
+
+      auction.bids.push({ user: interaction.user, diamonds, items, timestamp: Date.now() });
       interaction.reply(`Bid placed: ${diamonds > 0 ? `${diamonds} 💎` : ''}${items ? ` and ${items}` : ''}`);
     }
 
@@ -398,7 +431,11 @@ client.on('interactionCreate', async (interaction) => {
           new ButtonBuilder()
             .setCustomId('bid_button')
             .setLabel('Bid')
-            .setStyle(ButtonStyle.Primary)
+            .setStyle(ButtonStyle.Primary),
+          new ButtonBuilder()
+            .setCustomId('view_bids_button')
+            .setLabel('View Bids')
+            .setStyle(ButtonStyle.Secondary)
         );
 
       const message = await targetChannel.send({ embeds: [embed], components: [row] });
