@@ -10,8 +10,8 @@ let redirectChannelId = null;
 let redirectTradeChannelId = null;
 let redirectInventoryChannelId = null;
 
-const auctions = new Map(); // channelId -> { host, title, description, model, time, startingPrice, bids: [{user, diamonds, items}], timer, started, channelId, messageId, updateInterval }
-const trades = new Map(); // messageId -> { host, hostDiamonds, hostItems, offers: [{user, diamonds, items, timestamp}], channelId, messageId, accepted: false, acceptedUser: null }
+const auctions = new Map(); // channelId -> { host, title, description, model, time, startingPrice, bids: [{user, diamonds, items}], timer, started, channelId, messageId, updateInterval, notificationMessageId }
+const trades = new Map(); // messageId -> { host, hostDiamonds, hostItems, offers: [{user, diamonds, items, timestamp}], channelId, messageId, accepted: false, acceptedUser: null, notificationMessages: [] }
 const inventories = new Map(); // userId -> { messageId, channelId, items, diamonds, lookingFor, robloxUsername, lastEdited }
 const userTradeCount = new Map(); // userId -> count of active trades
 
@@ -212,6 +212,17 @@ function formatBid(num) {
   return num.toString();
 }
 
+function formatItemDisplay(item) {
+  if (typeof item === 'object' && item.name && item.quantity) {
+    // Check if it's a diamonds item
+    if (item.name.includes('💎') || item.name.includes('Diamonds')) {
+      return `${item.name} x${formatBid(item.quantity)}`;
+    }
+    return `${item.name} x${item.quantity}`;
+  }
+  return item;
+}
+
 function getItemCategory(itemName) {
   if (itemCategories.huges) {
     for (const subcategoryItems of Object.values(itemCategories.huges)) {
@@ -237,7 +248,7 @@ client.on('interactionCreate', async (interaction) => {
         .setTitle('Auction System Setup')
         .setDescription('Welcome to the live auction system!\n\n**How it works:**\n- Auctions are held per channel to avoid conflicts.\n- Bidding can be done via text (e.g., "bid 10000") or slash commands.\n- The auction ends automatically after the set time, or can be ended early.\n- Winner is the highest bidder (diamonds first, then first bid if tie).\n\nClick the button below to create a new auction.')
         .setColor(0x00ff00)
-        .setFooter({ text: 'Version 1.0.9 | Made By Atlas' })
+        .setFooter({ text: 'Version 1.1.0 | Made By Atlas' })
         .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
       const row = new ActionRowBuilder()
@@ -394,7 +405,7 @@ client.on('interactionCreate', async (interaction) => {
           .setTitle(auction.title)
           .setDescription(`${auction.description}\n\n**Looking For:** ${auction.model}\n**Starting Price:** ${formatBid(auction.startingPrice)} 💎\n**Current Bid:** ${formatBid(currentBid)} 💎\n**Time Remaining:** ${remaining}s\n**Hosted by:** ${auction.host}`)
           .setColor(0x00ff00)
-          .setFooter({ text: 'Version 1.0.9 | Made By Atlas' })
+          .setFooter({ text: 'Version 1.1.0 | Made By Atlas' })
           .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
         try {
           const channel = interaction.guild.channels.cache.get(auction.channelId);
@@ -452,7 +463,7 @@ client.on('interactionCreate', async (interaction) => {
         .setTitle('Trade System Setup')
         .setDescription('Welcome to the live trade system!\n\n**How it works:**\n- Create a trade offer with items or diamonds.\n- Other users can place their offers in response.\n- Host can accept or decline offers.\n- Once accepted, both users are notified.\n\nClick the button below to create a new trade.')
         .setColor(0x0099ff)
-        .setFooter({ text: 'Version 1.0.9 | Made By Atlas' })
+        .setFooter({ text: 'Version 1.1.0 | Made By Atlas' })
         .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
       const row = new ActionRowBuilder()
@@ -595,7 +606,7 @@ client.on('interactionCreate', async (interaction) => {
         .setTitle('Bid List')
         .setDescription(bidList)
         .setColor(0x00ff00)
-        .setFooter({ text: 'Version 1.0.9 | Made By Atlas' })
+        .setFooter({ text: 'Version 1.1.0 | Made By Atlas' })
         .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
       interaction.reply({ embeds: [embed], ephemeral: true });
@@ -697,7 +708,8 @@ client.on('interactionCreate', async (interaction) => {
           { label: 'Huges', value: 'huges', emoji: '🔥' },
           { label: 'Exclusives', value: 'exclusives', emoji: '✨' },
           { label: 'Eggs', value: 'eggs', emoji: '🥚' },
-          { label: 'Gifts', value: 'gifts', emoji: '🎁' }
+          { label: 'Gifts', value: 'gifts', emoji: '🎁' },
+          { label: 'Diamonds', value: 'diamonds', emoji: '💎' }
         ]);
 
       const row = new ActionRowBuilder().addComponents(categorySelect);
@@ -720,10 +732,25 @@ client.on('interactionCreate', async (interaction) => {
       trade.accepted = true;
       trade.acceptedUser = lastOffer.user;
 
+      // Delete all notification messages
+      const channel = interaction.guild.channels.cache.get(trade.channelId);
+      if (channel && trade.notificationMessages && trade.notificationMessages.length > 0) {
+        for (const msgId of trade.notificationMessages) {
+          try {
+            const msg = await channel.messages.fetch(msgId);
+            await msg.delete();
+          } catch (e) {
+            // ignore if message not found
+          }
+        }
+        trade.notificationMessages = [];
+      }
+
       // Update embed and ping both users
       await updateTradeEmbed(interaction.guild, trade, messageId);
-      const channel = interaction.guild.channels.cache.get(trade.channelId);
-      await channel.send(`✅ Trade accepted! ${trade.host} and ${lastOffer.user}, your trade has been accepted.`);
+      if (channel) {
+        await channel.send(`✅ Trade accepted! ${trade.host} and ${lastOffer.user}, your trade has been accepted.`);
+      }
 
       await interaction.reply({ content: 'Trade accepted!', ephemeral: true });
     }
@@ -738,10 +765,23 @@ client.on('interactionCreate', async (interaction) => {
       const lastOffer = trade.offers[trade.offers.length - 1];
       trade.offers.pop();
 
+      // Delete the last notification message
+      const channel = interaction.guild.channels.cache.get(trade.channelId);
+      if (channel && trade.notificationMessages && trade.notificationMessages.length > 0) {
+        const lastMsgId = trade.notificationMessages.pop();
+        try {
+          const msg = await channel.messages.fetch(lastMsgId);
+          await msg.delete();
+        } catch (e) {
+          // ignore if message not found
+        }
+      }
+
       // Update embed
       await updateTradeEmbed(interaction.guild, trade, messageId);
-      const channel = interaction.guild.channels.cache.get(trade.channelId);
-      await channel.send(`❌ Trade offer from ${lastOffer.user} has been declined.`);
+      if (channel) {
+        await channel.send(`❌ Trade offer from ${lastOffer.user} has been declined.`);
+      }
 
       await interaction.reply({ content: 'Offer declined!', ephemeral: true });
     }
@@ -778,6 +818,33 @@ client.on('interactionCreate', async (interaction) => {
 
       trades.delete(tradeMessageId);
       await interaction.reply({ content: 'Trade deleted!', ephemeral: true });
+    }
+
+    if (interaction.customId.startsWith('auction_delete_final_')) {
+      // Find the auction by the message
+      let auction = null;
+      let auctionChannelId = null;
+
+      for (const [channelId, a] of auctions) {
+        if (a.finalMessageId === interaction.message.id) {
+          auction = a;
+          auctionChannelId = channelId;
+          break;
+        }
+      }
+
+      if (!auction) return interaction.reply({ content: 'Auction not found.', ephemeral: true });
+      if (auction.host.id !== interaction.user.id) return interaction.reply({ content: 'Only the host can delete this auction.', ephemeral: true });
+
+      // Delete the auction message
+      try {
+        await interaction.message.delete();
+      } catch (e) {
+        // ignore if message not found
+      }
+
+      auctions.delete(auctionChannelId);
+      await interaction.reply({ content: 'Auction deleted!', ephemeral: true });
     }
 
     if (interaction.customId === 'inventory_update_button') {
@@ -1374,11 +1441,11 @@ client.on('interactionCreate', async (interaction) => {
       const diamondsStr = interaction.fields.getTextInputValue('offer_diamonds_amount');
       const diamonds = parseBid(diamondsStr);
 
-      if (!interaction.user.offerTradeItems) {
-        interaction.user.offerTradeItems = [];
+      // Store diamonds separately - don't add as item
+      if (!interaction.user.offerDiamonds) {
+        interaction.user.offerDiamonds = 0;
       }
-
-      interaction.user.offerTradeItems.push({ name: `💎 Diamonds`, quantity: diamonds });
+      interaction.user.offerDiamonds += diamonds;
 
       const { StringSelectMenuBuilder } = require('discord.js');
       
@@ -1393,9 +1460,14 @@ client.on('interactionCreate', async (interaction) => {
       const row = new ActionRowBuilder().addComponents(continueSelect);
       
       let itemsList = '';
-      interaction.user.offerTradeItems.forEach(item => {
-        itemsList += `${item.name} x${item.quantity}\n`;
-      });
+      if (interaction.user.offerTradeItems && interaction.user.offerTradeItems.length > 0) {
+        interaction.user.offerTradeItems.forEach(item => {
+          itemsList += `${item.name} x${item.quantity}\n`;
+        });
+      }
+      if (interaction.user.offerDiamonds && interaction.user.offerDiamonds > 0) {
+        itemsList += `💎 Diamonds: ${formatBid(interaction.user.offerDiamonds)}\n`;
+      }
 
       await interaction.reply({ 
         content: `**Selected Items:**\n${itemsList}\n\nWhat would you like to do?`,
@@ -1629,7 +1701,7 @@ client.on('interactionCreate', async (interaction) => {
         const embed = new EmbedBuilder()
           .setTitle('📦 Inventory')
           .setColor(0x00a8ff)
-          .setFooter({ text: 'Version 1.0.9 | Made By Atlas' })
+          .setFooter({ text: 'Version 1.1.0 | Made By Atlas' })
           .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
         if (previousInventory.robloxUsername) {
@@ -1722,7 +1794,7 @@ client.on('interactionCreate', async (interaction) => {
       const embed = new EmbedBuilder()
         .setTitle('📦 Inventory')
         .setColor(0x00a8ff)
-        .setFooter({ text: 'Version 1.0.9 | Made By Atlas' })
+        .setFooter({ text: 'Version 1.1.0 | Made By Atlas' })
         .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
       if (robloxUsername) {
@@ -1809,15 +1881,13 @@ client.on('interactionCreate', async (interaction) => {
         .setTitle('Trade Offer')
         .setDescription(`**Host:** ${interaction.user}\n**Status:** Waiting for offers`)
         .setColor(0x0099ff)
-        .setFooter({ text: 'Version 1.0.9 | Made By Atlas' })
+        .setFooter({ text: 'Version 1.1.0 | Made By Atlas' })
         .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
       // Format host items with quantities
       let hostItemsText = 'None';
       if (hostItems.length > 0) {
-        hostItemsText = hostItems.map(item => 
-          typeof item === 'object' ? `${item.name} x${item.quantity}` : item
-        ).join('\n');
+        hostItemsText = hostItems.map(item => formatItemDisplay(item)).join('\n');
       }
       
       embed.addFields({
@@ -1850,7 +1920,8 @@ client.on('interactionCreate', async (interaction) => {
         messageId: message.id,
         accepted: false,
         acceptedUser: null,
-        targetUsername: targetUsername
+        targetUsername: targetUsername,
+        notificationMessages: []
       };
 
       trades.set(message.id, trade);
@@ -1859,7 +1930,7 @@ client.on('interactionCreate', async (interaction) => {
       const currentCount = userTradeCount.get(interaction.user.id) || 0;
       userTradeCount.set(interaction.user.id, currentCount + 1);
 
-      await interaction.reply({ content: `Trade offer created! ${targetUsername ? `Awaiting response from ${targetUsername}.` : 'Open for all users.'}`, flags: 64 });
+      await interaction.reply({ content: `Trade offer created in ${targetChannel}! ${targetUsername ? `Awaiting response from ${targetUsername}.` : 'Open for all users.'}`, flags: 64 });
       return;
     }
 
@@ -1872,9 +1943,16 @@ client.on('interactionCreate', async (interaction) => {
         diamonds = parseBid(diamondsStr);
       }
 
+      // Add diamonds stored from category selection
+      if (interaction.user.offerDiamonds && interaction.user.offerDiamonds > 0) {
+        diamonds += interaction.user.offerDiamonds;
+        delete interaction.user.offerDiamonds;
+      }
+
       const offerItems = interaction.user.offerItems || [];
       delete interaction.user.offerItems;
       delete interaction.user.messageId;
+      delete interaction.user.offerTradeItems;
 
       const trade = trades.get(messageId);
       if (!trade) return interaction.reply({ content: 'Trade not found.', flags: 64 });
@@ -1893,7 +1971,8 @@ client.on('interactionCreate', async (interaction) => {
       // Notify host of new offer
       const channel = interaction.guild.channels.cache.get(trade.channelId);
       if (channel) {
-        await channel.send(`📢 ${trade.host}, you received an offer of ${interaction.user}!`);
+        const notifMsg = await channel.send(`📢 ${trade.host}, you received an offer of ${interaction.user}!`);
+        trade.notificationMessages.push(notifMsg.id);
       }
 
       await interaction.reply({ content: `Offer submitted! Host will accept or decline.`, flags: 64 });
@@ -1956,13 +2035,14 @@ client.on('interactionCreate', async (interaction) => {
       if (!targetChannel) return interaction.reply({ content: 'Redirect channel not found.', ephemeral: true });
 
       // Send ping message first
-      await targetChannel.send('-# ||<@&1461741243427197132>||');
+      const pingMsg = await targetChannel.send('-# ||<@&1461741243427197132>||');
+      auction.notificationMessageId = pingMsg.id;
 
       const embed = new EmbedBuilder()
         .setTitle(title)
         .setDescription(`${description}\n\n**Looking For:** ${model}\n**Starting Price:** ${formatBid(startingPrice)} 💎\n**Current Bid:** ${formatBid(startingPrice)} 💎\n**Time Remaining:** ${time}s\n**Hosted by:** ${interaction.user}`)
         .setColor(0x00ff00)
-        .setFooter({ text: 'Version 1.0.9 | Made By Atlas' })
+        .setFooter({ text: 'Version 1.1.0 | Made By Atlas' })
         .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
       const row = new ActionRowBuilder()
@@ -2002,7 +2082,7 @@ client.on('interactionCreate', async (interaction) => {
           .setTitle(auction.title)
           .setDescription(`${auction.description}\n\n**Looking For:** ${auction.model}\n**Starting Price:** ${formatBid(auction.startingPrice)} 💎\n**Current Bid:** ${formatBid(currentBid)} 💎\n**Time Remaining:** ${remaining}s\n**Hosted by:** ${auction.host}`)
           .setColor(0x00ff00)
-          .setFooter({ text: 'Version 1.0.9 | Made By Atlas' })
+          .setFooter({ text: 'Version 1.1.0 | Made By Atlas' })
           .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
         try {
           await message.edit({ embeds: [updatedEmbed], components: [row] });
@@ -2028,7 +2108,7 @@ async function updateTradeEmbed(guild, trade, messageId) {
     const embed = new EmbedBuilder()
       .setTitle('Trade Offer')
       .setColor(trade.accepted ? 0x00ff00 : 0x0099ff)
-      .setFooter({ text: 'Version 1.0.9 | Made By Atlas' })
+      .setFooter({ text: 'Version 1.1.0 | Made By Atlas' })
       .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
     if (trade.accepted) {
@@ -2043,9 +2123,7 @@ async function updateTradeEmbed(guild, trade, messageId) {
       embed.setDescription(`**Status:** Waiting for offers\n\n**Host:** ${trade.host}`);
     }
 
-    const hostItemsText = trade.hostItems.length > 0 ? trade.hostItems.map(item => 
-      typeof item === 'object' ? `${item.name} x${item.quantity}` : item
-    ).join('\n') : 'None';
+    const hostItemsText = trade.hostItems.length > 0 ? trade.hostItems.map(item => formatItemDisplay(item)).join('\n') : 'None';
     embed.addFields({
       name: `Host${trade.hostDiamonds > 0 ? ` (+ ${formatBid(trade.hostDiamonds)} 💎)` : ''}`,
       value: hostItemsText || 'None',
@@ -2054,9 +2132,7 @@ async function updateTradeEmbed(guild, trade, messageId) {
 
     if (trade.offers.length > 0 && !trade.accepted) {
       const lastOffer = trade.offers[trade.offers.length - 1];
-      const guestItemsText = lastOffer.items.length > 0 ? lastOffer.items.map(item => 
-        typeof item === 'object' ? `${item.name} x${item.quantity}` : item
-      ).join('\n') : 'None';
+      const guestItemsText = lastOffer.items.length > 0 ? lastOffer.items.map(item => formatItemDisplay(item)).join('\n') : 'None';
       embed.addFields({
         name: `${lastOffer.user.username}${lastOffer.diamonds > 0 ? ` (+ ${formatBid(lastOffer.diamonds)} 💎)` : ''}`,
         value: guestItemsText || 'None',
@@ -2065,9 +2141,7 @@ async function updateTradeEmbed(guild, trade, messageId) {
     } else if (trade.accepted) {
       const acceptedOffer = trade.offers.find(o => o.user.id === trade.acceptedUser.id);
       if (acceptedOffer) {
-        const guestItemsText = acceptedOffer.items.length > 0 ? acceptedOffer.items.map(item => 
-          typeof item === 'object' ? `${item.name} x${item.quantity}` : item
-        ).join('\n') : 'None';
+        const guestItemsText = acceptedOffer.items.length > 0 ? acceptedOffer.items.map(item => formatItemDisplay(item)).join('\n') : 'None';
         embed.addFields({
           name: `${acceptedOffer.user.username}${acceptedOffer.diamonds > 0 ? ` (+ ${formatBid(acceptedOffer.diamonds)} 💎)` : ''}`,
           value: guestItemsText || 'None',
@@ -2116,6 +2190,17 @@ async function endAuction(channel) {
 
   clearTimeout(auction.timer);
   clearInterval(auction.updateInterval);
+
+  // Delete the ping notification message
+  if (auction.notificationMessageId) {
+    try {
+      const pingMsg = await channel.messages.fetch(auction.notificationMessageId);
+      await pingMsg.delete();
+    } catch (e) {
+      // ignore if message not found
+    }
+  }
+
   auctions.delete(channel.id);
 
   if (auction.bids.length === 0) {
@@ -2128,10 +2213,23 @@ async function endAuction(channel) {
 
   const embed = new EmbedBuilder()
     .setTitle('Auction Ended!')
-    .setDescription(`**Title:** ${auction.title}\n**Winner:** ${winner.user}\n**Bid:** ${winner.diamonds} 💎${winner.items ? ` and ${winner.items}` : ''}`)
+    .setDescription(`**Title:** ${auction.title}\n**Winner:** ${winner.user}\n**Bid:** ${formatBid(winner.diamonds)} 💎${winner.items ? ` and ${winner.items}` : ''}`)
     .setColor(0xff0000);
 
-  channel.send({ embeds: [embed] });
+  // Add delete button for host
+  const deleteButton = new ButtonBuilder()
+    .setCustomId(`auction_delete_final_${Date.now()}`)
+    .setLabel('Delete Auction')
+    .setStyle(ButtonStyle.Danger);
+  
+  const row = new ActionRowBuilder().addComponents(deleteButton);
+
+  const msg = await channel.send({ embeds: [embed], components: [row] });
+  
+  // Store auction data for the delete button
+  auction.finalMessageId = msg.id;
+  auction.hostId = auction.host.id;
+  auctions.set(channel.id, auction);
 }
 
 client.login(process.env.TOKEN || config.token);
