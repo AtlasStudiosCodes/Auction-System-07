@@ -86,7 +86,7 @@ client.on('messageCreate', async (message) => {
     const items = match[2] || '';
     const diamonds = parseBid(diamondsStr);
 
-    if (auction.model === 'items' && diamonds > 0) return message.reply('This auction is items only.');
+    if (auction.model === 'items' && diamonds > 0) return message.reply('This auction is offers only.');
     if (auction.model === 'diamonds' && items) return message.reply('This auction is diamonds only.');
 
     // Add bid
@@ -277,7 +277,7 @@ client.on('interactionCreate', async (interaction) => {
         .setCustomId('diamonds')
         .setLabel('Diamonds (💎)')
         .setStyle(TextInputStyle.Short)
-        .setPlaceholder('10000 or 10K')
+        .setPlaceholder('10000')
         .setRequired(auction.model !== 'items');
 
       const itemsInput = new TextInputBuilder()
@@ -383,10 +383,10 @@ client.on('interactionCreate', async (interaction) => {
         diamonds = parseBid(diamondsStr);
       }
 
-      if (auction.model === 'items' && diamonds > 0) return interaction.reply({ content: 'This auction is items only.', ephemeral: true });
+      if (auction.model === 'items' && diamonds > 0) return interaction.reply({ content: 'This auction is offers only.', ephemeral: true });
       if (auction.model === 'diamonds' && items) return interaction.reply({ content: 'This auction is diamonds only.', ephemeral: true });
       if (auction.model === 'diamonds' && diamonds === 0) return interaction.reply({ content: 'Please enter diamonds.', ephemeral: true });
-      if (auction.model === 'items' && !items) return interaction.reply({ content: 'Please enter items.', ephemeral: true });
+      if (auction.model === 'items' && !items) return interaction.reply({ content: 'Please enter an offer.', ephemeral: true });
 
       // Check if bid is higher than current max
       const maxBid = auction.bids.length > 0 ? Math.max(...auction.bids.map(b => b.diamonds)) : auction.startingPrice;
@@ -403,7 +403,7 @@ client.on('interactionCreate', async (interaction) => {
       const startingPriceStr = interaction.fields.getTextInputValue('starting_price');
       const model = interaction.fields.getTextInputValue('model').toLowerCase();
 
-      if (!['diamonds', 'items', 'both'].includes(model)) return interaction.reply({ content: 'Invalid model. Use diamonds, items, or both.', ephemeral: true });
+      if (!['diamonds', 'items', 'both'].includes(model)) return interaction.reply({ content: 'Invalid model. Use diamonds, items/offer, or both.', ephemeral: true });
       const time = parseInt(timeStr);
       if (isNaN(time) || time <= 0) return interaction.reply({ content: 'Invalid time.', ephemeral: true });
       const startingPrice = parseInt(startingPriceStr);
