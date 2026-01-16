@@ -409,8 +409,10 @@ client.on('interactionCreate', async (interaction) => {
       const startingPrice = parseInt(startingPriceStr);
       if (isNaN(startingPrice) || startingPrice < 0) return interaction.reply({ content: 'Invalid starting price.', ephemeral: true });
 
-      if (Array.from(auctions.values()).some(a => a.channelId === interaction.channel.id)) {
-        return interaction.reply({ content: 'An auction is already running in this channel.', ephemeral: true });
+      const finalTime = Math.min(time, 60);
+
+      if (auctions.size > 0) {
+        return interaction.reply({ content: 'An auction is already running in the server. Please wait for it to end.', ephemeral: true });
       }
 
       const auction = {
@@ -418,7 +420,7 @@ client.on('interactionCreate', async (interaction) => {
         title,
         description,
         model,
-        time,
+        time: finalTime,
         startingPrice,
         bids: [],
         started: new Date(),
@@ -430,7 +432,7 @@ client.on('interactionCreate', async (interaction) => {
 
       const embed = new EmbedBuilder()
         .setTitle(title)
-        .setDescription(`${description}\n\n**Looking For:** ${model}\n**Starting Price:** ${startingPrice} 💎\n**Current Bid:** ${startingPrice} 💎\n**Time Remaining:** ${time}s\n**Hosted by:** ${interaction.user}`)
+        .setDescription(`${description}\n\n**Looking For:** ${model}\n**Starting Price:** ${startingPrice} 💎\n**Current Bid:** ${startingPrice} 💎\n**Time Remaining:** ${finalTime}s\n**Hosted by:** ${interaction.user}`)
         .setColor(0x00ff00)
         .setFooter({ text: 'Version 1.0.3 | Made By Atlas' })
         .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
