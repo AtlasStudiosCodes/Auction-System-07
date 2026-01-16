@@ -212,6 +212,18 @@ function formatBid(num) {
   return num.toString();
 }
 
+function getItemCategory(itemName) {
+  if (itemCategories.huges) {
+    for (const subcategoryItems of Object.values(itemCategories.huges)) {
+      if (subcategoryItems.includes(itemName)) return 'huges';
+    }
+  }
+  if (itemCategories.exclusives && itemCategories.exclusives.includes(itemName)) return 'exclusives';
+  if (itemCategories.eggs && itemCategories.eggs.includes(itemName)) return 'eggs';
+  if (itemCategories.gifts && itemCategories.gifts.includes(itemName)) return 'gifts';
+  return 'gifts';
+}
+
 client.on('interactionCreate', async (interaction) => {
   if (interaction.isCommand()) {
     const { commandName } = interaction;
@@ -792,9 +804,96 @@ client.on('interactionCreate', async (interaction) => {
       const row = new ActionRowBuilder().addComponents(categorySelect);
       await interaction.reply({ content: 'Select an item category to add to your inventory:', components: [row], ephemeral: true });
     }
+
+    if (interaction.customId === 'inventory_remove_button') {
+      // Load previous inventory items
+      const previousInventory = inventories.get(interaction.user.id);
+      if (!previousInventory || previousInventory.items.length === 0) {
+        return interaction.reply({ content: 'Your inventory is empty. Nothing to remove.', ephemeral: true });
+      }
+
+      interaction.user.inventoryItems = previousInventory.items;
+
+      // Show category selection for inventory removal
+      const { StringSelectMenuBuilder } = require('discord.js');
+      
+      const categorySelect = new StringSelectMenuBuilder()
+        .setCustomId('inventory_remove_category_select')
+        .setPlaceholder('Select an item category to remove from')
+        .addOptions([
+          { label: 'Huges', value: 'huges', emoji: '🔥' },
+          { label: 'Exclusives', value: 'exclusives', emoji: '✨' },
+          { label: 'Eggs', value: 'eggs', emoji: '🥚' },
+          { label: 'Gifts', value: 'gifts', emoji: '🎁' }
+        ]);
+
+      const row = new ActionRowBuilder().addComponents(categorySelect);
+      await interaction.reply({ content: 'Select an item category to remove from your inventory:', components: [row], ephemeral: true });
+    }
   }
 
   if (interaction.isStringSelectMenu()) {
+    if (interaction.customId === 'inventory_remove_category_select') {
+      const category = interaction.values[0];
+      const { StringSelectMenuBuilder } = require('discord.js');
+      
+      const previousInventory = inventories.get(interaction.user.id);
+      if (!previousInventory) return interaction.reply({ content: 'Inventory not found.', flags: 64 });
+
+      // Filter items from this category
+      const itemsInCategory = previousInventory.items.filter(item => {
+        return getItemCategory(item.name) === category;
+      });
+
+      if (itemsInCategory.length === 0) {
+        return interaction.reply({ content: `You have no items from the ${category} category to remove.`, ephemeral: true });
+      }
+
+      const itemSelect = new StringSelectMenuBuilder()
+        .setCustomId(`inventory_remove_item_select_${category}`)
+        .setPlaceholder(`Select items to remove from ${category}`)
+        .setMaxValues(Math.min(itemsInCategory.length, 25))
+        .addOptions(itemsInCategory.map(item => ({ label: item.name, value: item.name })));
+
+      const row = new ActionRowBuilder().addComponents(itemSelect);
+      await interaction.reply({ content: `Select items from **${category}** to remove:`, components: [row], flags: 64 });
+    }
+
+    if (interaction.customId.startsWith('inventory_remove_item_select_')) {
+      const category = interaction.customId.replace('inventory_remove_item_select_', '');
+      const selectedItems = interaction.values;
+
+      const previousInventory = inventories.get(interaction.user.id);
+      if (!previousInventory) return interaction.reply({ content: 'Inventory not found.', flags: 64 });
+
+      // Store items selection for quantity input
+      interaction.user.selectedRemoveItems = selectedItems;
+      interaction.user.selectedRemoveCategory = category;
+
+      // Show quantity selection modal
+      const quantityModal = new ModalBuilder()
+        .setCustomId(`inventory_remove_quantities_modal`)
+        .setTitle('Select Quantities to Remove');
+
+      let inputs = [];
+      selectedItems.slice(0, 5).forEach((item, index) => {
+        const currentItem = previousInventory.items.find(i => i.name === item);
+        const currentQty = currentItem ? currentItem.quantity : 0;
+        
+        const input = new TextInputBuilder()
+          .setCustomId(`remove_qty_${index}`)
+          .setLabel(`${item} (have: ${currentQty})`)
+          .setStyle(TextInputStyle.Short)
+          .setPlaceholder('0')
+          .setRequired(true)
+          .setMaxLength(3);
+        inputs.push(new ActionRowBuilder().addComponents(input));
+      });
+
+      quantityModal.addComponents(inputs);
+      await interaction.showModal(quantityModal);
+    }
+
     if (interaction.customId === 'trade_category_select') {
       const category = interaction.values[0];
       const { StringSelectMenuBuilder } = require('discord.js');
@@ -1471,6 +1570,127 @@ client.on('interactionCreate', async (interaction) => {
       return;
     }
 
+    if (interaction.customId === 'inventory_remove_quantities_modal') {
+      const selectedItems = interaction.user.selectedRemoveItems || [];
+      const category = interaction.user.selectedRemoveCategory || '';
+      
+      const previousInventory = inventories.get(interaction.user.id);
+      if (!previousInventory) return interaction.reply({ content: 'Inventory not found.', flags: 64 });
+
+      let removalErrors = [];
+      let successfulRemovals = [];
+
+      // Process each selected item
+      for (let i = 0; i < selectedItems.length; i++) {
+        const itemName = selectedItems[i];
+        const qtyStr = interaction.fields.getTextInputValue(`remove_qty_${i}`);
+        const removeQty = parseInt(qtyStr) || 0;
+
+        if (removeQty <= 0) continue;
+
+        // Find the item in inventory
+        const itemIndex = previousInventory.items.findIndex(item => item.name === itemName);
+        if (itemIndex === -1) {
+          removalErrors.push(`❌ **${itemName}**: You don't have this item.`);
+          continue;
+        }
+
+        const currentQty = previousInventory.items[itemIndex].quantity;
+        if (currentQty < removeQty) {
+          removalErrors.push(`❌ **${itemName}**: You only have ${currentQty}, can't remove ${removeQty}.`);
+          continue;
+        }
+
+        // Remove the item
+        previousInventory.items[itemIndex].quantity -= removeQty;
+        if (previousInventory.items[itemIndex].quantity === 0) {
+          previousInventory.items.splice(itemIndex, 1);
+        }
+        successfulRemovals.push(`✅ **${itemName}**: Removed ${removeQty}`);
+      }
+
+      // Update inventory data
+      inventories.set(interaction.user.id, previousInventory);
+
+      // Create response message
+      let responseMessage = '';
+      if (successfulRemovals.length > 0) {
+        responseMessage += `**Removals Successful:**\n${successfulRemovals.join('\n')}\n\n`;
+      }
+      if (removalErrors.length > 0) {
+        responseMessage += `**Errors:**\n${removalErrors.join('\n')}`;
+      }
+
+      // Update the inventory embed
+      try {
+        const channel = interaction.guild.channels.cache.get(previousInventory.channelId);
+        const message = await channel.messages.fetch(previousInventory.messageId);
+        
+        // Rebuild the embed
+        const embed = new EmbedBuilder()
+          .setTitle('📦 Inventory')
+          .setColor(0x00a8ff)
+          .setFooter({ text: 'Version 1.0.9 | Made By Atlas' })
+          .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
+
+        if (previousInventory.robloxUsername) {
+          embed.setAuthor({ 
+            name: interaction.user.username, 
+            iconURL: `https://www.roblox.com/bust-thumbnails/v1/individual?userIds=${previousInventory.robloxUsername}&size=420x420&format=Png&isCircular=false` 
+          });
+        } else {
+          embed.setAuthor({ name: interaction.user.username, iconURL: interaction.user.displayAvatarURL() });
+        }
+
+        const itemsText = previousInventory.items.length > 0 ? previousInventory.items.map(item => 
+          `${item.name} x${item.quantity}`
+        ).join('\n') : 'None';
+
+        embed.addFields({
+          name: `Items${previousInventory.diamonds > 0 ? ` + ${formatBid(previousInventory.diamonds)} 💎` : ''}`,
+          value: itemsText || 'None',
+          inline: true
+        });
+
+        embed.addFields({
+          name: 'Looking For',
+          value: previousInventory.lookingFor || 'Not specified',
+          inline: true
+        });
+
+        const now = new Date();
+        const timeStr = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()} at ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+        embed.addFields({
+          name: 'Last Edited',
+          value: timeStr,
+          inline: false
+        });
+
+        const updateButton = new ButtonBuilder()
+          .setCustomId('inventory_update_button')
+          .setLabel('Update Inventory')
+          .setStyle(ButtonStyle.Primary);
+
+        const removeButton = new ButtonBuilder()
+          .setCustomId('inventory_remove_button')
+          .setLabel('Remove Items')
+          .setStyle(ButtonStyle.Danger);
+
+        const row = new ActionRowBuilder().addComponents(updateButton, removeButton);
+
+        await message.edit({ embeds: [embed], components: [row] });
+      } catch (e) {
+        console.log('Failed to update inventory message:', e);
+      }
+
+      // Clean up
+      delete interaction.user.selectedRemoveItems;
+      delete interaction.user.selectedRemoveCategory;
+
+      await interaction.reply({ content: responseMessage || 'Removal completed.', ephemeral: true });
+      return;
+    }
+
     if (interaction.customId === 'inventory_setup_modal') {
       const diamondsStr = interaction.fields.getTextInputValue('inv_diamonds') || '0';
       const lookingFor = interaction.fields.getTextInputValue('inv_looking_for') || 'Not specified';
@@ -1544,7 +1764,12 @@ client.on('interactionCreate', async (interaction) => {
         .setLabel('Update Inventory')
         .setStyle(ButtonStyle.Primary);
 
-      const row = new ActionRowBuilder().addComponents(updateButton);
+      const removeButton = new ButtonBuilder()
+        .setCustomId('inventory_remove_button')
+        .setLabel('Remove Items')
+        .setStyle(ButtonStyle.Danger);
+
+      const row = new ActionRowBuilder().addComponents(updateButton, removeButton);
 
       const targetChannel = redirectInventoryChannelId ? interaction.guild.channels.cache.get(redirectInventoryChannelId) : interaction.channel;
       const message = await targetChannel.send({ embeds: [embed], components: [row] });
