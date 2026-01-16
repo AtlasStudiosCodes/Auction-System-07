@@ -8,9 +8,12 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBit
 
 let redirectChannelId = null;
 let redirectTradeChannelId = null;
+let redirectInventoryChannelId = null;
 
 const auctions = new Map(); // channelId -> { host, title, description, model, time, startingPrice, bids: [{user, diamonds, items}], timer, started, channelId, messageId, updateInterval }
 const trades = new Map(); // messageId -> { host, hostDiamonds, hostItems, offers: [{user, diamonds, items, timestamp}], channelId, messageId, accepted: false, acceptedUser: null }
+const inventories = new Map(); // userId -> { messageId, channelId, items, diamonds, lookingFor, robloxUsername, lastEdited }
+const userTradeCount = new Map(); // userId -> count of active trades
 
 // Item categories for trades
 const itemCategories = {
@@ -111,6 +114,46 @@ client.once('ready', async () => {
         }
       ]
     },
+    {
+      name: 'deletetrade',
+      description: 'Delete a trade by message ID (admin only)',
+      options: [
+        {
+          name: 'messageid',
+          type: ApplicationCommandOptionType.String,
+          description: 'The message ID of the trade',
+          required: true
+        }
+      ]
+    },
+    {
+      name: 'accepttrade',
+      description: 'Accept a trade by message ID (admin only)',
+      options: [
+        {
+          name: 'messageid',
+          type: ApplicationCommandOptionType.String,
+          description: 'The message ID of the trade',
+          required: true
+        }
+      ]
+    },
+    {
+      name: 'setupinventory',
+      description: 'Create or view your inventory'
+    },
+    {
+      name: 'redirectinventory',
+      description: 'Set the channel for inventories (admin only)',
+      options: [
+        {
+          name: 'channel',
+          type: ApplicationCommandOptionType.Channel,
+          description: 'The channel for inventories',
+          required: true
+        }
+      ]
+    },
   ];
 
   await client.application.commands.set(commands);
@@ -182,7 +225,7 @@ client.on('interactionCreate', async (interaction) => {
         .setTitle('Auction System Setup')
         .setDescription('Welcome to the live auction system!\n\n**How it works:**\n- Auctions are held per channel to avoid conflicts.\n- Bidding can be done via text (e.g., "bid 10000") or slash commands.\n- The auction ends automatically after the set time, or can be ended early.\n- Winner is the highest bidder (diamonds first, then first bid if tie).\n\nClick the button below to create a new auction.')
         .setColor(0x00ff00)
-        .setFooter({ text: 'Version 1.0.8 | Made By Atlas' })
+        .setFooter({ text: 'Version 1.0.9 | Made By Atlas' })
         .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
       const row = new ActionRowBuilder()
@@ -339,7 +382,7 @@ client.on('interactionCreate', async (interaction) => {
           .setTitle(auction.title)
           .setDescription(`${auction.description}\n\n**Looking For:** ${auction.model}\n**Starting Price:** ${formatBid(auction.startingPrice)} 💎\n**Current Bid:** ${formatBid(currentBid)} 💎\n**Time Remaining:** ${remaining}s\n**Hosted by:** ${auction.host}`)
           .setColor(0x00ff00)
-          .setFooter({ text: 'Version 1.0.8 | Made By Atlas' })
+          .setFooter({ text: 'Version 1.0.9 | Made By Atlas' })
           .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
         try {
           const channel = interaction.guild.channels.cache.get(auction.channelId);
@@ -371,12 +414,33 @@ client.on('interactionCreate', async (interaction) => {
       interaction.reply({ content: `All future trades will be redirected to ${channel}.`, ephemeral: true });
     }
 
+    if (commandName === 'redirectinventory') {
+      if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+      const channel = interaction.options.getChannel('channel');
+      if (channel.type !== 0) return interaction.reply({ content: 'Please select a text channel.', ephemeral: true });
+      redirectInventoryChannelId = channel.id;
+      interaction.reply({ content: `All inventories will be posted to ${channel}.`, ephemeral: true });
+    }
+
     if (commandName === 'setuptrade') {
+      // Check trade limit
+      const adminRoles = ['1461505505401896972', '1461481291118678087', '1461484563183435817'];
+      const isAdmin = interaction.member.roles.cache.some(role => adminRoles.includes(role.id));
+      const userTradeLimit = isAdmin ? 10 : 2;
+      const currentTradeCount = userTradeCount.get(interaction.user.id) || 0;
+
+      if (currentTradeCount >= userTradeLimit) {
+        return interaction.reply({ 
+          content: `You have reached your trade creation limit (${userTradeLimit}). ${isAdmin ? 'As an admin, you can have up to 10 active trades.' : 'Regular users can have up to 2 active trades.'}`,
+          ephemeral: true 
+        });
+      }
+
       const embed = new EmbedBuilder()
         .setTitle('Trade System Setup')
         .setDescription('Welcome to the live trade system!\n\n**How it works:**\n- Create a trade offer with items or diamonds.\n- Other users can place their offers in response.\n- Host can accept or decline offers.\n- Once accepted, both users are notified.\n\nClick the button below to create a new trade.')
         .setColor(0x0099ff)
-        .setFooter({ text: 'Version 1.0.8 | Made By Atlas' })
+        .setFooter({ text: 'Version 1.0.9 | Made By Atlas' })
         .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
       const row = new ActionRowBuilder()
@@ -388,6 +452,80 @@ client.on('interactionCreate', async (interaction) => {
         );
 
       await interaction.reply({ embeds: [embed], components: [row] });
+    }
+
+    if (commandName === 'deletetrade') {
+      const adminRoles = ['1461505505401896972', '1461481291118678087', '1461484563183435817'];
+      const hasAdminRole = interaction.member.roles.cache.some(role => adminRoles.includes(role.id));
+      if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+
+      const messageId = interaction.options.getString('messageid');
+      const trade = trades.get(messageId);
+      if (!trade) return interaction.reply({ content: 'Trade not found.', ephemeral: true });
+
+      // Decrement trade count for host
+      const hostId = trade.host.id;
+      const currentCount = userTradeCount.get(hostId) || 0;
+      if (currentCount > 0) {
+        userTradeCount.set(hostId, currentCount - 1);
+      }
+
+      // Delete the trade message
+      try {
+        const channel = interaction.guild.channels.cache.get(trade.channelId);
+        const message = await channel.messages.fetch(messageId);
+        await message.delete();
+      } catch (e) {
+        // ignore if message not found
+      }
+
+      trades.delete(messageId);
+      interaction.reply({ content: `Trade from ${trade.host} has been deleted.`, ephemeral: true });
+    }
+
+    if (commandName === 'accepttrade') {
+      const adminRoles = ['1461505505401896972', '1461481291118678087', '1461484563183435817'];
+      const hasAdminRole = interaction.member.roles.cache.some(role => adminRoles.includes(role.id));
+      if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+
+      const messageId = interaction.options.getString('messageid');
+      const trade = trades.get(messageId);
+      if (!trade) return interaction.reply({ content: 'Trade not found.', ephemeral: true });
+
+      if (trade.offers.length > 0) {
+        return interaction.reply({ content: 'This trade has offers and cannot be cancelled this way.', ephemeral: true });
+      }
+
+      // Mark trade as cancelled
+      trade.accepted = true;
+      trade.acceptedUser = null;
+      trade.adminCancelled = true;
+
+      // Update embed
+      await updateTradeEmbed(interaction.guild, trade, messageId);
+
+      const channel = interaction.guild.channels.cache.get(trade.channelId);
+      await channel.send(`❌ This trade has been cancelled by an admin.`);
+
+      interaction.reply({ content: `Trade has been cancelled.`, ephemeral: true });
+    }
+
+    if (commandName === 'setupinventory') {
+      // Show category selection for inventory
+      const { StringSelectMenuBuilder } = require('discord.js');
+      
+      const categorySelect = new StringSelectMenuBuilder()
+        .setCustomId('inventory_category_select')
+        .setPlaceholder('Select an item category')
+        .addOptions([
+          { label: 'Huges', value: 'huges', emoji: '🔥' },
+          { label: 'Exclusives', value: 'exclusives', emoji: '✨' },
+          { label: 'Eggs', value: 'eggs', emoji: '🥚' },
+          { label: 'Gifts', value: 'gifts', emoji: '🎁' }
+        ]);
+
+      const row = new ActionRowBuilder().addComponents(categorySelect);
+      await interaction.reply({ content: 'Select an item category to add to your inventory:', components: [row], ephemeral: true });
     }
   }
 
@@ -444,7 +582,7 @@ client.on('interactionCreate', async (interaction) => {
         .setTitle('Bid List')
         .setDescription(bidList)
         .setColor(0x00ff00)
-        .setFooter({ text: 'Version 1.0.8 | Made By Atlas' })
+        .setFooter({ text: 'Version 1.0.9 | Made By Atlas' })
         .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
       interaction.reply({ embeds: [embed], ephemeral: true });
@@ -568,6 +706,58 @@ client.on('interactionCreate', async (interaction) => {
       await channel.send(`❌ Trade offer from ${lastOffer.user} has been declined.`);
 
       await interaction.reply({ content: 'Offer declined!', ephemeral: true });
+    }
+
+    if (interaction.customId.startsWith('trade_delete_')) {
+      // Find which trade this delete button belongs to
+      let tradeMessageId = null;
+      let trade = null;
+
+      for (const [messageId, t] of trades) {
+        if (t.messageId === interaction.message.id) {
+          tradeMessageId = messageId;
+          trade = t;
+          break;
+        }
+      }
+
+      if (!trade) return interaction.reply({ content: 'Trade not found.', ephemeral: true });
+      if (trade.host.id !== interaction.user.id) return interaction.reply({ content: 'Only the host can delete this trade.', ephemeral: true });
+
+      // Delete the trade message
+      try {
+        await interaction.message.delete();
+      } catch (e) {
+        // ignore if message not found
+      }
+
+      // Decrement trade count for host
+      const hostId = trade.host.id;
+      const currentCount = userTradeCount.get(hostId) || 0;
+      if (currentCount > 0) {
+        userTradeCount.set(hostId, currentCount - 1);
+      }
+
+      trades.delete(tradeMessageId);
+      await interaction.reply({ content: 'Trade deleted!', ephemeral: true });
+    }
+
+    if (interaction.customId === 'inventory_update_button') {
+      // Show category selection for inventory update
+      const { StringSelectMenuBuilder } = require('discord.js');
+      
+      const categorySelect = new StringSelectMenuBuilder()
+        .setCustomId('inventory_category_select')
+        .setPlaceholder('Select an item category')
+        .addOptions([
+          { label: 'Huges', value: 'huges', emoji: '🔥' },
+          { label: 'Exclusives', value: 'exclusives', emoji: '✨' },
+          { label: 'Eggs', value: 'eggs', emoji: '🥚' },
+          { label: 'Gifts', value: 'gifts', emoji: '🎁' }
+        ]);
+
+      const row = new ActionRowBuilder().addComponents(categorySelect);
+      await interaction.reply({ content: 'Select an item category to add to your inventory:', components: [row], ephemeral: true });
     }
   }
 
@@ -825,6 +1015,139 @@ client.on('interactionCreate', async (interaction) => {
         await interaction.showModal(diamondsModal);
       }
     }
+
+    if (interaction.customId === 'inventory_continue_select') {
+      const choice = interaction.values[0];
+
+      if (choice === 'add_category') {
+        const { StringSelectMenuBuilder } = require('discord.js');
+        
+        const categorySelect = new StringSelectMenuBuilder()
+          .setCustomId('inventory_category_select')
+          .setPlaceholder('Select another item category')
+          .addOptions([
+            { label: 'Huges', value: 'huges', emoji: '🔥' },
+            { label: 'Exclusives', value: 'exclusives', emoji: '✨' },
+            { label: 'Eggs', value: 'eggs', emoji: '🥚' },
+            { label: 'Gifts', value: 'gifts', emoji: '🎁' }
+          ]);
+
+        const row = new ActionRowBuilder().addComponents(categorySelect);
+        await interaction.reply({ content: 'Select another item category:', components: [row], flags: 64 });
+      } else if (choice === 'continue_to_setup') {
+        // Move to inventory setup modal
+        const inventoryModal = new ModalBuilder()
+          .setCustomId('inventory_setup_modal')
+          .setTitle('Complete Your Inventory');
+
+        const diamondsInput = new TextInputBuilder()
+          .setCustomId('inv_diamonds')
+          .setLabel('Diamonds in stock (optional)')
+          .setStyle(TextInputStyle.Short)
+          .setPlaceholder('0')
+          .setRequired(false);
+
+        const lookingForInput = new TextInputBuilder()
+          .setCustomId('inv_looking_for')
+          .setLabel('What are you looking for?')
+          .setStyle(TextInputStyle.Paragraph)
+          .setPlaceholder('Describe what items/diamonds you\'re looking for')
+          .setRequired(true);
+
+        const robloxInput = new TextInputBuilder()
+          .setCustomId('inv_roblox_username')
+          .setLabel('Roblox username (optional)')
+          .setStyle(TextInputStyle.Short)
+          .setPlaceholder('YourRobloxUsername')
+          .setRequired(false);
+
+        const row1 = new ActionRowBuilder().addComponents(diamondsInput);
+        const row2 = new ActionRowBuilder().addComponents(lookingForInput);
+        const row3 = new ActionRowBuilder().addComponents(robloxInput);
+
+        inventoryModal.addComponents(row1, row2, row3);
+        
+        delete interaction.user.selectedInventoryItems;
+        delete interaction.user.selectedInventoryCategory;
+        delete interaction.user.selectedInventorySubcategory;
+
+        await interaction.showModal(inventoryModal);
+      }
+    }
+
+    if (interaction.customId === 'inventory_category_select') {
+      const category = interaction.values[0];
+      const { StringSelectMenuBuilder } = require('discord.js');
+      
+      if (category === 'huges') {
+        const subcategorySelect = new StringSelectMenuBuilder()
+          .setCustomId('inventory_huge_subcategory_select')
+          .setPlaceholder('Select a Huge subcategory')
+          .addOptions(Object.keys(itemCategories.huges).map(sub => ({
+            label: sub,
+            value: sub
+          })));
+        const row = new ActionRowBuilder().addComponents(subcategorySelect);
+        await interaction.reply({ content: `Select a subcategory from **Huges**:`, components: [row], flags: 64 });
+        return;
+      }
+      
+      const items = itemCategories[category];
+      const itemSelect = new StringSelectMenuBuilder()
+        .setCustomId(`inventory_item_select_${category}`)
+        .setPlaceholder(`Select items from ${category}`)
+        .setMaxValues(Math.min(items.length, 25))
+        .addOptions(items.slice(0, 25).map(item => ({ label: item, value: item })));
+
+      const row = new ActionRowBuilder().addComponents(itemSelect);
+      await interaction.reply({ content: `Select items from **${category}** category:`, components: [row], flags: 64 });
+    }
+
+    if (interaction.customId === 'inventory_huge_subcategory_select') {
+      const subcategory = interaction.values[0];
+      const { StringSelectMenuBuilder } = require('discord.js');
+      
+      const items = itemCategories.huges[subcategory];
+      const itemSelect = new StringSelectMenuBuilder()
+        .setCustomId(`inventory_item_select_huges_${subcategory}`)
+        .setPlaceholder(`Select items from ${subcategory}`)
+        .setMaxValues(Math.min(items.length, 25))
+        .addOptions(items.map(item => ({ label: item, value: item })));
+
+      const row = new ActionRowBuilder().addComponents(itemSelect);
+      await interaction.reply({ content: `Select items from **${subcategory}**:`, components: [row], flags: 64 });
+    }
+
+    if (interaction.customId.startsWith('inventory_item_select_')) {
+      const parts = interaction.customId.replace('inventory_item_select_', '').split('_');
+      let category = parts[0];
+      let subcategory = parts.length > 1 ? parts.slice(1).join('_') : null;
+      
+      const selectedItems = interaction.values;
+
+      interaction.user.selectedInventoryItems = selectedItems;
+      interaction.user.selectedInventoryCategory = category;
+      interaction.user.selectedInventorySubcategory = subcategory;
+
+      const quantityModal = new ModalBuilder()
+        .setCustomId(`inventory_item_quantities_modal`)
+        .setTitle('Select Quantities');
+
+      let inputs = [];
+      selectedItems.slice(0, 5).forEach((item, index) => {
+        const input = new TextInputBuilder()
+          .setCustomId(`inv_qty_${index}`)
+          .setLabel(`${item} quantity`)
+          .setStyle(TextInputStyle.Short)
+          .setPlaceholder('1')
+          .setRequired(true)
+          .setMaxLength(3);
+        inputs.push(new ActionRowBuilder().addComponents(input));
+      });
+
+      quantityModal.addComponents(inputs);
+      await interaction.showModal(quantityModal);
+    }
   }
 
   if (interaction.isModalSubmit()) {
@@ -917,6 +1240,140 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   if (interaction.isModalSubmit()) {
+    if (interaction.customId === 'inventory_item_quantities_modal') {
+      const selectedItems = interaction.user.selectedInventoryItems || [];
+      const category = interaction.user.selectedInventoryCategory;
+      const subcategory = interaction.user.selectedInventorySubcategory;
+
+      const itemsWithQty = selectedItems.map((item, index) => {
+        const qty = parseInt(interaction.fields.getTextInputValue(`inv_qty_${index}`) || '1');
+        return { name: item, quantity: Math.max(1, qty) };
+      });
+
+      if (!interaction.user.inventoryItems) {
+        interaction.user.inventoryItems = [];
+      }
+      interaction.user.inventoryItems = interaction.user.inventoryItems.concat(itemsWithQty);
+
+      const { StringSelectMenuBuilder } = require('discord.js');
+      
+      const continueSelect = new StringSelectMenuBuilder()
+        .setCustomId(`inventory_continue_select`)
+        .setPlaceholder('What would you like to do?')
+        .addOptions([
+          { label: '✅ Continue to Next Step', value: 'continue_to_setup' },
+          { label: '➕ Add Another Category', value: 'add_category' }
+        ]);
+
+      const row = new ActionRowBuilder().addComponents(continueSelect);
+      
+      let itemsList = '';
+      interaction.user.inventoryItems.forEach(item => {
+        itemsList += `${item.name} x${item.quantity}\n`;
+      });
+
+      await interaction.reply({ 
+        content: `**Selected Items:**\n${itemsList}\n\nWhat would you like to do?`,
+        components: [row], 
+        flags: 64 
+      });
+      return;
+    }
+
+    if (interaction.customId === 'inventory_setup_modal') {
+      const diamondsStr = interaction.fields.getTextInputValue('inv_diamonds') || '0';
+      const lookingFor = interaction.fields.getTextInputValue('inv_looking_for') || 'Not specified';
+      const robloxUsername = interaction.fields.getTextInputValue('inv_roblox_username') || '';
+
+      let diamonds = 0;
+      if (diamondsStr && diamondsStr !== '0') {
+        diamonds = parseBid(diamondsStr);
+      }
+
+      const inventoryItems = interaction.user.inventoryItems || [];
+      delete interaction.user.inventoryItems;
+      delete interaction.user.selectedInventoryItems;
+      delete interaction.user.selectedInventoryCategory;
+      delete interaction.user.selectedInventorySubcategory;
+
+      // Delete previous inventory if exists
+      const previousInventory = inventories.get(interaction.user.id);
+      if (previousInventory) {
+        try {
+          const channel = interaction.guild.channels.cache.get(previousInventory.channelId);
+          const message = await channel.messages.fetch(previousInventory.messageId);
+          await message.delete();
+        } catch (e) {
+          // ignore if message not found
+        }
+      }
+
+      // Create inventory embed
+      const embed = new EmbedBuilder()
+        .setTitle('📦 Inventory')
+        .setColor(0x00a8ff)
+        .setFooter({ text: 'Version 1.0.9 | Made By Atlas' })
+        .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
+
+      if (robloxUsername) {
+        embed.setAuthor({ 
+          name: interaction.user.username, 
+          iconURL: `https://www.roblox.com/bust-thumbnails/v1/individual?userIds=${robloxUsername}&size=420x420&format=Png&isCircular=false` 
+        });
+      } else {
+        embed.setAuthor({ name: interaction.user.username, iconURL: interaction.user.displayAvatarURL() });
+      }
+
+      const itemsText = inventoryItems.length > 0 ? inventoryItems.map(item => 
+        `${item.name} x${item.quantity}`
+      ).join('\n') : 'None';
+
+      embed.addFields({
+        name: `Items${diamonds > 0 ? ` + ${diamonds} 💎` : ''}`,
+        value: itemsText || 'None',
+        inline: true
+      });
+
+      embed.addFields({
+        name: 'Looking For',
+        value: lookingFor,
+        inline: true
+      });
+
+      const now = new Date();
+      const timeStr = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()} at ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+      embed.addFields({
+        name: 'Last Edited',
+        value: timeStr,
+        inline: false
+      });
+
+      const updateButton = new ButtonBuilder()
+        .setCustomId('inventory_update_button')
+        .setLabel('Update Inventory')
+        .setStyle(ButtonStyle.Primary);
+
+      const row = new ActionRowBuilder().addComponents(updateButton);
+
+      const targetChannel = redirectInventoryChannelId ? interaction.guild.channels.cache.get(redirectInventoryChannelId) : interaction.channel;
+      const message = await targetChannel.send({ embeds: [embed], components: [row] });
+
+      const inventoryData = {
+        messageId: message.id,
+        channelId: targetChannel.id,
+        items: inventoryItems,
+        diamonds: diamonds,
+        lookingFor: lookingFor,
+        robloxUsername: robloxUsername,
+        lastEdited: now
+      };
+
+      inventories.set(interaction.user.id, inventoryData);
+
+      await interaction.reply({ content: `Inventory created! Posted to the inventory channel.`, flags: 64 });
+      return;
+    }
+
     if (interaction.customId === 'trade_setup_modal') {
       const diamondsStr = interaction.fields.getTextInputValue('trade_diamonds') || '0';
       const targetUsername = interaction.fields.getTextInputValue('trade_target_user') || '';
@@ -937,7 +1394,7 @@ client.on('interactionCreate', async (interaction) => {
         .setTitle('Trade Offer')
         .setDescription(`**Host:** ${interaction.user}\n**Status:** Waiting for offers`)
         .setColor(0x0099ff)
-        .setFooter({ text: 'Version 1.0.8 | Made By Atlas' })
+        .setFooter({ text: 'Version 1.0.9 | Made By Atlas' })
         .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
       // Format host items with quantities
@@ -959,7 +1416,12 @@ client.on('interactionCreate', async (interaction) => {
         .setLabel('Make Offer')
         .setStyle(ButtonStyle.Primary);
 
-      const row = new ActionRowBuilder().addComponents(offerButton);
+      const deleteButton = new ButtonBuilder()
+        .setCustomId(`trade_delete_${Date.now()}`)
+        .setLabel('Delete')
+        .setStyle(ButtonStyle.Danger);
+
+      const row = new ActionRowBuilder().addComponents(offerButton, deleteButton);
 
       const targetChannel = redirectTradeChannelId ? interaction.guild.channels.cache.get(redirectTradeChannelId) : interaction.channel;
       const message = await targetChannel.send({ embeds: [embed], components: [row] });
@@ -977,6 +1439,10 @@ client.on('interactionCreate', async (interaction) => {
       };
 
       trades.set(message.id, trade);
+
+      // Increment trade count for user
+      const currentCount = userTradeCount.get(interaction.user.id) || 0;
+      userTradeCount.set(interaction.user.id, currentCount + 1);
 
       await interaction.reply({ content: `Trade offer created! ${targetUsername ? `Awaiting response from ${targetUsername}.` : 'Open for all users.'}`, flags: 64 });
       return;
@@ -1081,7 +1547,7 @@ client.on('interactionCreate', async (interaction) => {
         .setTitle(title)
         .setDescription(`${description}\n\n**Looking For:** ${model}\n**Starting Price:** ${formatBid(startingPrice)} 💎\n**Current Bid:** ${formatBid(startingPrice)} 💎\n**Time Remaining:** ${time}s\n**Hosted by:** ${interaction.user}`)
         .setColor(0x00ff00)
-        .setFooter({ text: 'Version 1.0.8 | Made By Atlas' })
+        .setFooter({ text: 'Version 1.0.9 | Made By Atlas' })
         .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
       const row = new ActionRowBuilder()
@@ -1121,7 +1587,7 @@ client.on('interactionCreate', async (interaction) => {
           .setTitle(auction.title)
           .setDescription(`${auction.description}\n\n**Looking For:** ${auction.model}\n**Starting Price:** ${formatBid(auction.startingPrice)} 💎\n**Current Bid:** ${formatBid(currentBid)} 💎\n**Time Remaining:** ${remaining}s\n**Hosted by:** ${auction.host}`)
           .setColor(0x00ff00)
-          .setFooter({ text: 'Version 1.0.8 | Made By Atlas' })
+          .setFooter({ text: 'Version 1.0.9 | Made By Atlas' })
           .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
         try {
           await message.edit({ embeds: [updatedEmbed], components: [row] });
@@ -1147,11 +1613,15 @@ async function updateTradeEmbed(guild, trade, messageId) {
     const embed = new EmbedBuilder()
       .setTitle('Trade Offer')
       .setColor(trade.accepted ? 0x00ff00 : 0x0099ff)
-      .setFooter({ text: 'Version 1.0.8 | Made By Atlas' })
+      .setFooter({ text: 'Version 1.0.9 | Made By Atlas' })
       .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
     if (trade.accepted) {
-      embed.setDescription(`**Status:** ✅ Trade Accepted\n\n**Host:** ${trade.host}\n**Guest:** ${trade.acceptedUser}`);
+      if (trade.adminCancelled) {
+        embed.setDescription(`**Status:** ❌ Cancelled by an admin\n\n**Host:** ${trade.host}`);
+      } else {
+        embed.setDescription(`**Status:** ✅ Trade Accepted\n\n**Host:** ${trade.host}\n**Guest:** ${trade.acceptedUser}`);
+      }
     } else if (trade.offers.length > 0) {
       embed.setDescription(`**Status:** Awaiting Host Decision\n\n**Host:** ${trade.host}`);
     } else {
@@ -1211,7 +1681,12 @@ async function updateTradeEmbed(guild, trade, messageId) {
         .setLabel('Make Offer')
         .setStyle(ButtonStyle.Primary);
 
-      components.push(new ActionRowBuilder().addComponents(offerButton));
+      const deleteButton = new ButtonBuilder()
+        .setCustomId(`trade_delete_${Date.now()}`)
+        .setLabel('Delete')
+        .setStyle(ButtonStyle.Danger);
+
+      components.push(new ActionRowBuilder().addComponents(offerButton, deleteButton));
     }
 
     await message.edit({ embeds: [embed], components });
