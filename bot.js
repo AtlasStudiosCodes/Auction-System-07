@@ -96,9 +96,13 @@ client.on('messageCreate', async (message) => {
 });
 
 function parseBid(str) {
-  str = str.replace(/,/g, '');
-  if (str.includes('K')) {
-    return parseInt(str.replace('K', '')) * 1000;
+  str = str.replace(/,/g, '').toLowerCase();
+  const multipliers = { 'k': 1000, 'm': 1000000, 'b': 1000000000, 't': 1000000000000 };
+  for (const [suffix, multiplier] of Object.entries(multipliers)) {
+    if (str.includes(suffix)) {
+      const num = parseFloat(str.replace(suffix, ''));
+      return Math.floor(num * multiplier);
+    }
   }
   return parseInt(str);
 }
@@ -237,7 +241,7 @@ client.on('interactionCreate', async (interaction) => {
         const currentBid = auction.bids.length > 0 ? Math.max(...auction.bids.map(b => b.diamonds)) : auction.startingPrice;
         const updatedEmbed = new EmbedBuilder()
           .setTitle(auction.title)
-          .setDescription(`${auction.description}\n\n**Looking For:** ${auction.model}\n**Starting Price:** ${auction.startingPrice} 💎\n**Current Bid:** ${currentBid} 💎\n**Time Remaining:** ${remaining}s`)
+          .setDescription(`${auction.description}\n\n**Looking For:** ${auction.model}\n**Starting Price:** ${auction.startingPrice} 💎\n**Current Bid:** ${currentBid} 💎\n**Time Remaining:** ${remaining}s\n**Hosted by:** ${auction.host}`)
           .setColor(0x00ff00)
           .setFooter({ text: 'Version 1.0.4 | Made By Atlas' })
           .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
@@ -340,12 +344,6 @@ client.on('interactionCreate', async (interaction) => {
         .setStyle(TextInputStyle.Paragraph)
         .setRequired(true);
 
-      const timeInput = new TextInputBuilder()
-        .setCustomId('time')
-        .setLabel('Time (seconds)')
-        .setStyle(TextInputStyle.Short)
-        .setRequired(true);
-
       const priceInput = new TextInputBuilder()
         .setCustomId('starting_price')
         .setLabel('Starting Price (💎)')
@@ -361,7 +359,6 @@ client.on('interactionCreate', async (interaction) => {
       modal.addComponents(
         new ActionRowBuilder().addComponents(titleInput),
         new ActionRowBuilder().addComponents(descInput),
-        new ActionRowBuilder().addComponents(timeInput),
         new ActionRowBuilder().addComponents(priceInput),
         new ActionRowBuilder().addComponents(modelInput)
       );
@@ -399,17 +396,13 @@ client.on('interactionCreate', async (interaction) => {
     if (interaction.customId === 'auction_modal') {
       const title = interaction.fields.getTextInputValue('title');
       const description = interaction.fields.getTextInputValue('description');
-      const timeStr = interaction.fields.getTextInputValue('time');
       const startingPriceStr = interaction.fields.getTextInputValue('starting_price');
       const model = interaction.fields.getTextInputValue('model').toLowerCase();
 
       if (!['diamonds', 'items', 'both'].includes(model)) return interaction.reply({ content: 'Invalid model. Use diamonds, items/offer, or both.', ephemeral: true });
-      const time = parseInt(timeStr);
-      if (isNaN(time) || time <= 0) return interaction.reply({ content: 'Invalid time.', ephemeral: true });
+      const time = 60; // Fixed to 60 seconds
       const startingPrice = parseInt(startingPriceStr);
       if (isNaN(startingPrice) || startingPrice < 0) return interaction.reply({ content: 'Invalid starting price.', ephemeral: true });
-
-      const finalTime = Math.min(time, 60);
 
       if (auctions.size > 0) {
         return interaction.reply({ content: 'An auction is already running in the server. Please wait for it to end.', ephemeral: true });
@@ -420,7 +413,7 @@ client.on('interactionCreate', async (interaction) => {
         title,
         description,
         model,
-        time: finalTime,
+        time,
         startingPrice,
         bids: [],
         started: new Date(),
@@ -432,7 +425,7 @@ client.on('interactionCreate', async (interaction) => {
 
       const embed = new EmbedBuilder()
         .setTitle(title)
-        .setDescription(`${description}\n\n**Looking For:** ${model}\n**Starting Price:** ${startingPrice} 💎\n**Current Bid:** ${startingPrice} 💎\n**Time Remaining:** ${finalTime}s\n**Hosted by:** ${interaction.user}`)
+        .setDescription(`${description}\n\n**Looking For:** ${model}\n**Starting Price:** ${startingPrice} 💎\n**Current Bid:** ${startingPrice} 💎\n**Time Remaining:** ${time}s\n**Hosted by:** ${interaction.user}`)
         .setColor(0x00ff00)
         .setFooter({ text: 'Version 1.0.4 | Made By Atlas' })
         .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
@@ -471,8 +464,10 @@ client.on('interactionCreate', async (interaction) => {
         }
         const updatedEmbed = new EmbedBuilder()
           .setTitle(auction.title)
-          .setDescription(`${auction.description}\n\n**Looking For:** ${auction.model}\n**Starting Price:** ${auction.startingPrice} 💎\n**Time Remaining:** ${remaining}s\n**Hosted by:** ${auction.host}`)
-          .setColor(0x00ff00);
+          .setDescription(`${auction.description}\n\n**Looking For:** ${auction.model}\n**Starting Price:** ${auction.startingPrice} 💎\n**Current Bid:** ${currentBid} 💎\n**Time Remaining:** ${remaining}s\n**Hosted by:** ${auction.host}`)
+          .setColor(0x00ff00)
+          .setFooter({ text: 'Version 1.0.4 | Made By Atlas' })
+          .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
         try {
           await message.edit({ embeds: [updatedEmbed], components: [row] });
         } catch (e) {
