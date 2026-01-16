@@ -483,9 +483,12 @@ client.on('interactionCreate', async (interaction) => {
       const targetChannel = redirectChannelId ? interaction.guild.channels.cache.get(redirectChannelId) : interaction.channel;
       if (!targetChannel) return interaction.reply({ content: 'Redirect channel not found.', ephemeral: true });
 
+      // Send ping message first
+      await targetChannel.send('-# ||<@&1461741243427197132>||');
+
       const embed = new EmbedBuilder()
         .setTitle(title)
-        .setDescription(`${description}\n\n**Looking For:** ${model}\n**Starting Price:** ${formatBid(startingPrice)} 💎\n**Current Bid:** ${formatBid(startingPrice)} 💎\n**Time Remaining:** ${time}s\n**Hosted by:** ${interaction.user}\n\n-# ||<@&1461741243427197132>||`)
+        .setDescription(`${description}\n\n**Looking For:** ${model}\n**Starting Price:** ${formatBid(startingPrice)} 💎\n**Current Bid:** ${formatBid(startingPrice)} 💎\n**Time Remaining:** ${time}s\n**Hosted by:** ${interaction.user}`)
         .setColor(0x00ff00)
         .setFooter({ text: 'Version 1.0.6 | Made By Atlas' })
         .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
