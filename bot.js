@@ -115,6 +115,24 @@ function parseBid(str) {
   return parseInt(str);
 }
 
+function formatBid(num) {
+  const suffixes = [
+    { suffix: 'T', value: 1000000000000 },
+    { suffix: 'B', value: 1000000000 },
+    { suffix: 'M', value: 1000000 },
+    { suffix: 'K', value: 1000 }
+  ];
+
+  for (const { suffix, value } of suffixes) {
+    if (num >= value) {
+      const formatted = (num / value).toFixed(1);
+      // Remove trailing .0
+      return formatted.endsWith('.0') ? formatted.slice(0, -2) + suffix : formatted + suffix;
+    }
+  }
+  return num.toString();
+}
+
 client.on('interactionCreate', async (interaction) => {
   if (interaction.isCommand()) {
     const { commandName } = interaction;
@@ -189,7 +207,7 @@ client.on('interactionCreate', async (interaction) => {
 
       const embed = new EmbedBuilder()
         .setTitle('Auction Status')
-        .setDescription(`Title: ${auction.title}\nDescription: ${auction.description}\nModel: ${auction.model}\nStarting Price: ${auction.startingPrice} 💎\nTime Left: ${Math.max(0, auction.time - Math.floor((Date.now() - auction.started) / 1000))} seconds\nBids: ${auction.bids.length}`)
+        .setDescription(`Title: ${auction.title}\nDescription: ${auction.description}\nModel: ${auction.model}\nStarting Price: ${formatBid(auction.startingPrice)} 💎\nTime Left: ${Math.max(0, auction.time - Math.floor((Date.now() - auction.started) / 1000))} seconds\nBids: ${auction.bids.length}`)
         .setColor(0x0000ff);
 
       interaction.reply({ embeds: [embed], ephemeral: true });
@@ -283,7 +301,7 @@ client.on('interactionCreate', async (interaction) => {
         const currentBid = auction.bids.length > 0 ? Math.max(...auction.bids.map(b => b.diamonds)) : auction.startingPrice;
         const updatedEmbed = new EmbedBuilder()
           .setTitle(auction.title)
-          .setDescription(`${auction.description}\n\n**Looking For:** ${auction.model}\n**Starting Price:** ${auction.startingPrice} 💎\n**Current Bid:** ${currentBid} 💎\n**Time Remaining:** ${remaining}s\n**Hosted by:** ${auction.host}`)
+          .setDescription(`${auction.description}\n\n**Looking For:** ${auction.model}\n**Starting Price:** ${formatBid(auction.startingPrice)} 💎\n**Current Bid:** ${formatBid(currentBid)} 💎\n**Time Remaining:** ${remaining}s\n**Hosted by:** ${auction.host}`)
           .setColor(0x00ff00)
           .setFooter({ text: 'Version 1.0.4 | Made By Atlas' })
           .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
@@ -443,7 +461,7 @@ client.on('interactionCreate', async (interaction) => {
 
       if (!['diamonds', 'items', 'both'].includes(model)) return interaction.reply({ content: 'Invalid model. Use diamonds, items/offer, or both.', ephemeral: true });
       const time = 60; // Fixed to 60 seconds
-      const startingPrice = parseInt(startingPriceStr);
+      const startingPrice = parseBid(startingPriceStr);
       if (isNaN(startingPrice) || startingPrice < 0) return interaction.reply({ content: 'Invalid starting price.', ephemeral: true });
 
       if (auctions.size > 0) {
@@ -467,7 +485,7 @@ client.on('interactionCreate', async (interaction) => {
 
       const embed = new EmbedBuilder()
         .setTitle(title)
-        .setDescription(`${description}\n\n**Looking For:** ${model}\n**Starting Price:** ${startingPrice} 💎\n**Current Bid:** ${startingPrice} 💎\n**Time Remaining:** ${time}s\n**Hosted by:** ${interaction.user}`)
+        .setDescription(`${description}\n\n**Looking For:** ${model}\n**Starting Price:** ${formatBid(startingPrice)} 💎\n**Current Bid:** ${formatBid(startingPrice)} 💎\n**Time Remaining:** ${time}s\n**Hosted by:** ${interaction.user}`)
         .setColor(0x00ff00)
         .setFooter({ text: 'Version 1.0.4 | Made By Atlas' })
         .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
@@ -507,7 +525,7 @@ client.on('interactionCreate', async (interaction) => {
         const currentBid = auction.bids.length > 0 ? Math.max(...auction.bids.map(b => b.diamonds)) : auction.startingPrice;
         const updatedEmbed = new EmbedBuilder()
           .setTitle(auction.title)
-          .setDescription(`${auction.description}\n\n**Looking For:** ${auction.model}\n**Starting Price:** ${auction.startingPrice} 💎\n**Current Bid:** ${currentBid} 💎\n**Time Remaining:** ${remaining}s\n**Hosted by:** ${auction.host}`)
+          .setDescription(`${auction.description}\n\n**Looking For:** ${auction.model}\n**Starting Price:** ${formatBid(auction.startingPrice)} 💎\n**Current Bid:** ${formatBid(currentBid)} 💎\n**Time Remaining:** ${remaining}s\n**Hosted by:** ${auction.host}`)
           .setColor(0x00ff00)
           .setFooter({ text: 'Version 1.0.4 | Made By Atlas' })
           .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
