@@ -91,17 +91,17 @@ function formatItemsText(items) {
   // Format items with emoji and name
   if (!items || items.length === 0) return 'None';
   
-  return items.map(item => {
-    if (typeof item === 'object') {
-      const emoji = getItemEmoji(item.name);
-      const formattedName = formatItemName(item.name);
-      return `${emoji} **${formattedName}** (**x${item.quantity}**)`;
-    } else {
-      const emoji = getItemEmoji(item);
-      const formattedName = formatItemName(item);
-      return `${emoji} **${formattedName}**`;
-    }
-  }).join('\n');
+    return items.map(item => {
+      if (typeof item === 'object') {
+        const emoji = getItemEmoji(item.name);
+        const formattedName = formatItemName(item.name);
+        return `${emoji} **${formattedName}** (**x${item.quantity}**)`;
+      } else {
+        const emoji = getItemEmoji(item);
+        const formattedName = formatItemName(item);
+        return `${emoji} **${formattedName}**`;
+      }
+    }).join('\n') || 'None';
 }
 
 // Save data every 5 minutes
@@ -1126,8 +1126,15 @@ client.on('interactionCreate', async (interaction) => {
           .setDescription(`**Winner:** ${winner.user}`)
           .setFooter({ text: 'Version 1.0.9 | Made By Atlas' });
 
-        // Format items with emojis and quantities
-        const itemsText = formatItemsText(giveaway.items);
+        // Format items with emojis and quantities, include diamonds
+        let itemsText = formatItemsText(giveaway.items);
+        // If no item entries, start with empty so diamonds show cleanly
+        if ((!giveaway.items || giveaway.items.length === 0) && itemsText === 'None') itemsText = '';
+        if (giveaway.diamonds && giveaway.diamonds > 0) {
+          const formatted = formatBid(giveaway.diamonds);
+          itemsText = itemsText ? `${itemsText}\n💎 **Diamonds** (**x${formatted}**)` : `💎 **Diamonds** (**x${formatted}**)`;
+        }
+        if (!itemsText) itemsText = 'None';
 
         embed.addFields({
           name: 'Giveaway Items',
@@ -2055,10 +2062,18 @@ client.on('interactionCreate', async (interaction) => {
           .setMaxLength(4)
           .setRequired(true);
 
+        const diamondsInput = new TextInputBuilder()
+          .setCustomId('gwa_diamonds')
+          .setLabel('Diamonds (optional, supports K/M/B)')
+          .setStyle(TextInputStyle.Short)
+          .setPlaceholder('e.g., 50000 or 50k')
+          .setRequired(false);
+
         const row1 = new ActionRowBuilder().addComponents(descriptionInput);
         const row2 = new ActionRowBuilder().addComponents(durationInput);
+        const row3 = new ActionRowBuilder().addComponents(diamondsInput);
 
-        giveawayModal.addComponents(row1, row2);
+        giveawayModal.addComponents(row1, row2, row3);
         
         delete interaction.user.selectedGiveawayItems;
         delete interaction.user.selectedGiveawayCategory;
@@ -2735,7 +2750,7 @@ client.on('interactionCreate', async (interaction) => {
       const giveawayItems = interaction.user.giveawayItems || [];
       const description = interaction.fields.getTextInputValue('gwa_description') || '';
       const durationStr = interaction.fields.getTextInputValue('gwa_duration');
-      
+      const diamondsStr = interaction.fields.getTextInputValue('gwa_diamonds') || '0';
       // Validate duration
       let duration = parseInt(durationStr);
       if (isNaN(duration) || duration < 1 || duration > 1440) {
@@ -2750,6 +2765,12 @@ client.on('interactionCreate', async (interaction) => {
       delete interaction.user.selectedGiveawayCategory;
       delete interaction.user.selectedGiveawaySubcategory;
 
+      // Parse diamonds (supports K/M/B) and keep for giveaway
+      let diamonds = 0;
+      if (diamondsStr && diamondsStr !== '0') {
+        diamonds = parseBid(diamondsStr);
+      }
+
       // Create giveaway embed
       const embed = new EmbedBuilder()
         .setTitle('🎁 Giveaway')
@@ -2758,8 +2779,15 @@ client.on('interactionCreate', async (interaction) => {
         .setFooter({ text: 'Version 1.0.9 | Made By Atlas' })
         .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
-      // Format giveaway items
-      const giveawayItemsText = formatItemsText(giveawayItems);
+      // Format giveaway items and diamonds
+      let giveawayItemsText = formatItemsText(giveawayItems);
+      // If no item entries, start with empty string so diamonds show cleanly
+      if ((!giveawayItems || giveawayItems.length === 0) && giveawayItemsText === 'None') giveawayItemsText = '';
+      if (diamonds > 0) {
+        const formatted = formatBid(diamonds);
+        giveawayItemsText = giveawayItemsText ? `${giveawayItemsText}\n💎 **Diamonds** (**x${formatted}**)` : `💎 **Diamonds** (**x${formatted}**)`;
+      }
+      if (!giveawayItemsText) giveawayItemsText = 'None';
 
       embed.addFields({
         name: 'Giveaway Items',
@@ -2810,6 +2838,7 @@ client.on('interactionCreate', async (interaction) => {
       const giveawayData = {
         host: interaction.user,
         items: giveawayItems,
+        diamonds: diamonds,
         channelId: targetChannel.id,
         messageId: message.id,
         entries: [],
@@ -2865,8 +2894,15 @@ client.on('interactionCreate', async (interaction) => {
             .setDescription(`**Winner:** ${winner.user}`)
             .setFooter({ text: 'Version 1.0.9 | Made By Atlas' });
 
-          // Format items with emojis and quantities
-          const itemsText = formatItemsText(giveaway.items);
+          // Format items with emojis and quantities, include diamonds
+          let itemsText = formatItemsText(giveaway.items);
+          // If no item entries, start with empty so diamonds show cleanly
+          if ((!giveaway.items || giveaway.items.length === 0) && itemsText === 'None') itemsText = '';
+          if (giveaway.diamonds && giveaway.diamonds > 0) {
+            const formatted = formatBid(giveaway.diamonds);
+            itemsText = itemsText ? `${itemsText}\n💎 **Diamonds** (**x${formatted}**)` : `💎 **Diamonds** (**x${formatted}**)`;
+          }
+          if (!itemsText) itemsText = 'None';
 
           winnerEmbed.addFields({
             name: 'Giveaway Items',
