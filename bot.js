@@ -95,14 +95,6 @@ client.once('ready', async () => {
       ]
     },
     {
-      name: 'endchanneladmin',
-      description: 'End the auction in this channel (admin only)'
-    },
-    {
-      name: 'deletechanneladmin',
-      description: 'Delete the auction in this channel (admin only)'
-    },
-    {
       name: 'setuptrade',
       description: 'Show trade setup information'
     },
@@ -253,44 +245,94 @@ client.on('interactionCreate', async (interaction) => {
       if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
 
       try {
+        await interaction.deferReply({ ephemeral: true });
+
         const versionFile = require('./version.json');
         const currentVersion = versionFile.version || '1.0.9';
 
-        // Update Auction embed
-        const auctionEmbed = new EmbedBuilder()
-          .setTitle('Auction System Setup')
-          .setDescription('Welcome to the live auction system!\n\n**How it works:**\n- Auctions are held per channel to avoid conflicts.\n- Bidding can be done via text (e.g., "bid 10000") or slash commands.\n- The auction ends automatically after the set time, or can be ended early.\n- Winner is the highest bidder (diamonds first, then first bid if tie).\n\nClick the button below to create a new auction.')
-          .setColor(0x00ff00)
-          .setFooter({ text: `Version ${currentVersion} | Made By Atlas` })
-          .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
+        // Define embeds to update
+        const categoriesToUpdate = [
+          {
+            title: 'Auction System Setup',
+            color: 0x00ff00,
+            description: 'Welcome to the live auction system!\n\n**How it works:**\n- Auctions are held per channel to avoid conflicts.\n- Bidding can be done via text (e.g., "bid 10000") or slash commands.\n- The auction ends automatically after the set time, or can be ended early.\n- Winner is the highest bidder (diamonds first, then first bid if tie).\n\nClick the button below to create a new auction.',
+            customId: 'create_auction',
+            buttonLabel: 'Create Auction'
+          },
+          {
+            title: 'Trade System Setup',
+            color: 0x0099ff,
+            description: 'Welcome to the live trade system!\n\n**How it works:**\n- Create a trade offer with items or diamonds.\n- Other users can place their offers in response.\n- Host can accept or decline offers.\n- Once accepted, both users are notified.\n\nClick the button below to create a new trade.',
+            customId: 'create_trade',
+            buttonLabel: 'Create Trade'
+          },
+          {
+            title: '📦 Inventory System Setup',
+            color: 0x00a8ff,
+            description: 'Welcome to the inventory system!\n\n**How it works:**\n- Create your personal inventory with items you have in stock.\n- Set your diamond amount and describe what you\'re looking for.\n- Optionally add your Roblox username to display your avatar.\n- Other users can see your inventory and make offers!\n- Update anytime - your previous items stay saved if you don\'t remove them.\n\nClick the button below to create or edit your inventory.',
+            customId: 'create_inventory',
+            buttonLabel: 'Create Inventory'
+          }
+        ];
 
-        // Update Trade embed
-        const tradeEmbed = new EmbedBuilder()
-          .setTitle('Trade System Setup')
-          .setDescription('Welcome to the live trade system!\n\n**How it works:**\n- Create a trade offer with items or diamonds.\n- Other users can place their offers in response.\n- Host can accept or decline offers.\n- Once accepted, both users are notified.\n\nClick the button below to create a new trade.')
-          .setColor(0x0099ff)
-          .setFooter({ text: `Version ${currentVersion} | Made By Atlas` })
-          .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
+        let updatedCount = 0;
+        let failedCount = 0;
 
-        // Update Inventory embed
-        const inventoryEmbed = new EmbedBuilder()
-          .setTitle('📦 Inventory System Setup')
-          .setDescription('Welcome to the inventory system!\n\n**How it works:**\n- Create your personal inventory with items you have in stock.\n- Set your diamond amount and describe what you\'re looking for.\n- Optionally add your Roblox username to display your avatar.\n- Other users can see your inventory and make offers!\n- Update anytime - your previous items stay saved if you don\'t remove them.\n\nClick the button below to create or edit your inventory.')
-          .setColor(0x00a8ff)
-          .setFooter({ text: `Version ${currentVersion} | Made By Atlas` })
-          .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
+        for (const category of categoriesToUpdate) {
+          try {
+            // Search for messages with this embed title in all channels
+            const channels = interaction.guild.channels.cache.filter(c => c.isTextBased());
+            
+            for (const [, channel] of channels) {
+              try {
+                const messages = await channel.messages.fetch({ limit: 100 });
+                
+                for (const [, message] of messages) {
+                  if (message.embeds.length > 0) {
+                    const embed = message.embeds[0];
+                    if (embed.title === category.title) {
+                      // Found the embed, update it
+                      const newEmbed = new EmbedBuilder()
+                        .setTitle(category.title)
+                        .setDescription(category.description)
+                        .setColor(category.color)
+                        .setFooter({ text: `Version ${currentVersion} | Made By Atlas` })
+                        .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
-        // Create confirmation embed
+                      const row = new ActionRowBuilder()
+                        .addComponents(
+                          new ButtonBuilder()
+                            .setCustomId(category.customId)
+                            .setLabel(category.buttonLabel)
+                            .setStyle(ButtonStyle.Primary)
+                        );
+
+                      await message.edit({ embeds: [newEmbed], components: [row] });
+                      updatedCount++;
+                      break; // Found and updated, move to next category
+                    }
+                  }
+                }
+              } catch (e) {
+                // Continue to next channel
+              }
+            }
+          } catch (e) {
+            failedCount++;
+            console.error(`Error updating ${category.title}:`, e);
+          }
+        }
+
         const updateEmbed = new EmbedBuilder()
           .setTitle('✅ Embeds Updated')
-          .setDescription(`All embeds have been updated to the latest version.\n\n**Updated:**\n- Create Auction\n- Create Trade\n- Create Inventory\n\n**New Version:** ${currentVersion}`)
+          .setDescription(`**Update Summary:**\n- ✅ Successfully updated: ${updatedCount} embed(s)\n- ❌ Failed: ${failedCount} embed(s)\n\n**Updated Version:** ${currentVersion}`)
           .setColor(0x00ff00)
           .setFooter({ text: `Version ${currentVersion} | Made By Atlas` });
 
-        await interaction.reply({ embeds: [updateEmbed], ephemeral: true });
+        await interaction.editReply({ embeds: [updateEmbed] });
       } catch (error) {
         console.error('Error updating embeds:', error);
-        await interaction.reply({ content: 'An error occurred while updating the embeds.', ephemeral: true });
+        await interaction.editReply({ content: 'An error occurred while updating the embeds.' });
       }
     }
 
@@ -383,35 +425,6 @@ client.on('interactionCreate', async (interaction) => {
       interaction.reply({ content: `Auction "${auction.title}" (from ${auction.host}) ended by admin.`, ephemeral: true });
     }
 
-    if (commandName === 'endchanneladmin') {
-      if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
-      const auction = Array.from(auctions.values()).find(a => a.channelId === interaction.channel.id);
-      if (!auction) return interaction.reply({ content: 'No auction running in this channel.', ephemeral: true });
-
-      clearTimeout(auction.timer);
-      clearInterval(auction.updateInterval);
-      await endAuction(interaction.channel);
-      interaction.reply({ content: `Auction "${auction.title}" (from ${auction.host}) ended by admin.`, ephemeral: true });
-    }
-
-    if (commandName === 'deletechanneladmin') {
-      if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
-      const auction = Array.from(auctions.values()).find(a => a.channelId === interaction.channel.id);
-      if (!auction) return interaction.reply({ content: 'No auction running in this channel.', ephemeral: true });
-
-      clearTimeout(auction.timer);
-      clearInterval(auction.updateInterval);
-      
-      try {
-        const message = await interaction.channel.messages.fetch(auction.messageId);
-        await message.delete();
-      } catch (e) {
-        // ignore if message not found
-      }
-      auctions.delete(interaction.channel.id);
-      interaction.reply({ content: `Auction "${auction.title}" (from ${auction.host}) deleted by admin.`, ephemeral: true });
-    }
-
     if (commandName === 'restartauction') {
       if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
       const messageId = interaction.options.getString('messageid');
@@ -478,9 +491,13 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (commandName === 'setuptrade') {
-      // Check trade limit
+      // Check admin permission first
       const adminRoles = ['1461505505401896972', '1461481291118678087', '1461484563183435817'];
-      const isAdmin = interaction.member.roles.cache.some(role => adminRoles.includes(role.id));
+      const hasAdminRole = interaction.member.roles.cache.some(role => adminRoles.includes(role.id));
+      if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+
+      // Check trade limit
+      const isAdmin = true; // Already checked admin above
       const userTradeLimit = isAdmin ? 10 : 2;
       const currentTradeCount = userTradeCount.get(interaction.user.id) || 0;
 
@@ -566,6 +583,10 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (commandName === 'setupinventory') {
+      const adminRoles = ['1461505505401896972', '1461481291118678087', '1461484563183435817'];
+      const hasAdminRole = interaction.member.roles.cache.some(role => adminRoles.includes(role.id));
+      if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+
       const embed = new EmbedBuilder()
         .setTitle('📦 Inventory System Setup')
         .setDescription('Welcome to the inventory system!\n\n**How it works:**\n- Create your personal inventory with items you have in stock.\n- Set your diamond amount and describe what you\'re looking for.\n- Optionally add your Roblox username to display your avatar.\n- Other users can see your inventory and make offers!\n- Update anytime - your previous items stay saved if you don\'t remove them.\n\nClick the button below to create or edit your inventory.')
@@ -585,64 +606,202 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (commandName === 'botcmds') {
-      const auctionEmbed = new EmbedBuilder()
-        .setTitle('🎪 Auction Commands')
-        .setColor(0x00ff00)
-        .setDescription('All auction-related commands')
-        .addFields(
-          { name: '/setupauction', value: 'Show auction setup information', inline: false },
-          { name: '/bid', value: 'Place a bid on the current auction', inline: false },
-          { name: '/endauction', value: 'End the current auction (host only)', inline: false },
-          { name: '/auctionstatus', value: 'View current auction status', inline: false },
-          { name: '/deleteauction [messageid]', value: 'Delete an auction (admin only)', inline: false },
-          { name: '/endauctionadmin [messageid]', value: 'End an auction timer (admin only)', inline: false },
-          { name: '/redirectauctions [channel]', value: 'Redirect all future auctions to a specific channel (admin only)', inline: false },
-          { name: '/endchanneladmin', value: 'End the auction in this channel (admin only)', inline: false },
-          { name: '/deletechanneladmin', value: 'Delete the auction in this channel (admin only)', inline: false }
-        )
-        .setFooter({ text: 'Auction System | Made By Atlas' })
-        .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
+      const pages = [
+        {
+          title: '🎪 Auction Commands',
+          color: 0x00ff00,
+          fields: [
+            { name: '/setupauction', value: 'Show auction setup information', inline: false },
+            { name: '/bid', value: 'Place a bid on the current auction', inline: false },
+            { name: '/endauction', value: 'End the current auction (host only)', inline: false },
+            { name: '/auctionstatus', value: 'View current auction status', inline: false },
+            { name: '/deleteauction [messageid]', value: 'Delete an auction (admin only)', inline: false },
+            { name: '/endauctionadmin [messageid]', value: 'End an auction timer (admin only)', inline: false },
+            { name: '/redirectauctions [channel]', value: 'Redirect all future auctions to a specific channel (admin only)', inline: false }
+          ]
+        },
+        {
+          title: '🔄 Trade Commands',
+          color: 0x0099ff,
+          fields: [
+            { name: '/setuptrade', value: 'Show trade setup information', inline: false },
+            { name: '/redirecttrade [channel]', value: 'Redirect all future trades to a specific channel (admin only)', inline: false },
+            { name: '/deletetrade [messageid]', value: 'Delete a trade by message ID (admin only)', inline: false },
+            { name: '/accepttrade [messageid]', value: 'Accept a trade by message ID (admin only)', inline: false }
+          ]
+        },
+        {
+          title: '📦 Inventory Commands',
+          color: 0x00a8ff,
+          fields: [
+            { name: '/setupinventory', value: 'Create or view your inventory', inline: false },
+            { name: '/redirectinventory [channel]', value: 'Set the channel for inventories (admin only)', inline: false }
+          ]
+        },
+        {
+          title: '⚙️ Utility Commands',
+          color: 0xffa500,
+          fields: [
+            { name: '/update', value: 'Update auction, trade, and inventory embeds (admin only)', inline: false },
+            { name: '/botcmds', value: 'View all available bot commands', inline: false }
+          ]
+        }
+      ];
 
-      const tradeEmbed = new EmbedBuilder()
-        .setTitle('🔄 Trade Commands')
-        .setColor(0x0099ff)
-        .setDescription('All trade-related commands')
-        .addFields(
-          { name: '/setuptrade', value: 'Show trade setup information', inline: false },
-          { name: '/redirecttrade [channel]', value: 'Redirect all future trades to a specific channel (admin only)', inline: false },
-          { name: '/deletetrade [messageid]', value: 'Delete a trade by message ID (admin only)', inline: false },
-          { name: '/accepttrade [messageid]', value: 'Accept a trade by message ID (admin only)', inline: false }
-        )
-        .setFooter({ text: 'Trade System | Made By Atlas' })
-        .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
+      let currentPage = 0;
 
-      const inventoryEmbed = new EmbedBuilder()
-        .setTitle('📦 Inventory Commands')
-        .setColor(0x00a8ff)
-        .setDescription('All inventory-related commands')
-        .addFields(
-          { name: '/setupinventory', value: 'Create or view your inventory', inline: false },
-          { name: '/redirectinventory [channel]', value: 'Set the channel for inventories (admin only)', inline: false }
-        )
-        .setFooter({ text: 'Inventory System | Made By Atlas' })
-        .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
+      const createEmbed = (pageIndex) => {
+        const page = pages[pageIndex];
+        return new EmbedBuilder()
+          .setTitle(page.title)
+          .setColor(page.color)
+          .setDescription(`Commands List (Page ${pageIndex + 1}/${pages.length})`)
+          .addFields(page.fields)
+          .setFooter({ text: `Page ${pageIndex + 1}/${pages.length} | Made By Atlas` })
+          .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
+      };
 
-      const utilityEmbed = new EmbedBuilder()
-        .setTitle('⚙️ Utility Commands')
-        .setColor(0xffa500)
-        .setDescription('General utility commands')
-        .addFields(
-          { name: '/update', value: 'Update auction, trade, and inventory embeds (admin only)', inline: false },
-          { name: '/botcmds', value: 'View all available bot commands', inline: false }
-        )
-        .setFooter({ text: 'Utility | Made By Atlas' })
-        .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
+      const createButtons = (pageIndex) => {
+        const row = new ActionRowBuilder();
+        
+        if (pageIndex > 0) {
+          row.addComponents(
+            new ButtonBuilder()
+              .setCustomId(`botcmds_prev_${pageIndex}`)
+              .setLabel('← Previous')
+              .setStyle(ButtonStyle.Primary)
+          );
+        }
 
-      await interaction.reply({ embeds: [auctionEmbed, tradeEmbed, inventoryEmbed, utilityEmbed], ephemeral: false });
+        row.addComponents(
+          new ButtonBuilder()
+            .setCustomId(`botcmds_page`)
+            .setLabel(`${pageIndex + 1}/${pages.length}`)
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(true)
+        );
+
+        if (pageIndex < pages.length - 1) {
+          row.addComponents(
+            new ButtonBuilder()
+              .setCustomId(`botcmds_next_${pageIndex}`)
+              .setLabel('Next →')
+              .setStyle(ButtonStyle.Primary)
+          );
+        }
+
+        return row;
+      };
+
+      const embed = createEmbed(currentPage);
+      const buttons = createButtons(currentPage);
+
+      await interaction.reply({ embeds: [embed], components: [buttons] });
     }
   }
 
   if (interaction.isButton()) {
+    // Handle botcmds pagination
+    if (interaction.customId.startsWith('botcmds_')) {
+      const pages = [
+        {
+          title: '🎪 Auction Commands',
+          color: 0x00ff00,
+          fields: [
+            { name: '/setupauction', value: 'Show auction setup information', inline: false },
+            { name: '/bid', value: 'Place a bid on the current auction', inline: false },
+            { name: '/endauction', value: 'End the current auction (host only)', inline: false },
+            { name: '/auctionstatus', value: 'View current auction status', inline: false },
+            { name: '/deleteauction [messageid]', value: 'Delete an auction (admin only)', inline: false },
+            { name: '/endauctionadmin [messageid]', value: 'End an auction timer (admin only)', inline: false },
+            { name: '/redirectauctions [channel]', value: 'Redirect all future auctions to a specific channel (admin only)', inline: false }
+          ]
+        },
+        {
+          title: '🔄 Trade Commands',
+          color: 0x0099ff,
+          fields: [
+            { name: '/setuptrade', value: 'Show trade setup information', inline: false },
+            { name: '/redirecttrade [channel]', value: 'Redirect all future trades to a specific channel (admin only)', inline: false },
+            { name: '/deletetrade [messageid]', value: 'Delete a trade by message ID (admin only)', inline: false },
+            { name: '/accepttrade [messageid]', value: 'Accept a trade by message ID (admin only)', inline: false }
+          ]
+        },
+        {
+          title: '📦 Inventory Commands',
+          color: 0x00a8ff,
+          fields: [
+            { name: '/setupinventory', value: 'Create or view your inventory', inline: false },
+            { name: '/redirectinventory [channel]', value: 'Set the channel for inventories (admin only)', inline: false }
+          ]
+        },
+        {
+          title: '⚙️ Utility Commands',
+          color: 0xffa500,
+          fields: [
+            { name: '/update', value: 'Update auction, trade, and inventory embeds (admin only)', inline: false },
+            { name: '/botcmds', value: 'View all available bot commands', inline: false }
+          ]
+        }
+      ];
+
+      let currentPage = 0;
+      if (interaction.customId.includes('_prev_')) {
+        currentPage = parseInt(interaction.customId.split('_prev_')[1]) - 1;
+      } else if (interaction.customId.includes('_next_')) {
+        currentPage = parseInt(interaction.customId.split('_next_')[1]) + 1;
+      }
+
+      const createEmbed = (pageIndex) => {
+        const page = pages[pageIndex];
+        return new EmbedBuilder()
+          .setTitle(page.title)
+          .setColor(page.color)
+          .setDescription(`Commands List (Page ${pageIndex + 1}/${pages.length})`)
+          .addFields(page.fields)
+          .setFooter({ text: `Page ${pageIndex + 1}/${pages.length} | Made By Atlas` })
+          .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
+      };
+
+      const createButtons = (pageIndex) => {
+        const row = new ActionRowBuilder();
+        
+        if (pageIndex > 0) {
+          row.addComponents(
+            new ButtonBuilder()
+              .setCustomId(`botcmds_prev_${pageIndex}`)
+              .setLabel('← Previous')
+              .setStyle(ButtonStyle.Primary)
+          );
+        }
+
+        row.addComponents(
+          new ButtonBuilder()
+            .setCustomId(`botcmds_page`)
+            .setLabel(`${pageIndex + 1}/${pages.length}`)
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(true)
+        );
+
+        if (pageIndex < pages.length - 1) {
+          row.addComponents(
+            new ButtonBuilder()
+              .setCustomId(`botcmds_next_${pageIndex}`)
+              .setLabel('Next →')
+              .setStyle(ButtonStyle.Primary)
+          );
+        }
+
+        return row;
+      };
+
+      const embed = createEmbed(currentPage);
+      const buttons = createButtons(currentPage);
+
+      await interaction.update({ embeds: [embed], components: [buttons] });
+      return;
+    }
+
     if (interaction.customId === 'bid_button') {
       const auction = Array.from(auctions.values()).find(a => a.channelId === interaction.channel.id);
       if (!auction) return interaction.reply({ content: 'No auction running.', ephemeral: true });
