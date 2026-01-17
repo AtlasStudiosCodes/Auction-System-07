@@ -10,11 +10,8 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBit
 let redirectChannelId = config.defaultAuctionChannelId || null;
 let redirectTradeChannelId = config.defaultTradeChannelId || null;
 let redirectInventoryChannelId = null;
-let redirectGiveawayChannelId = '1462190801198252226';
 
 const auctions = new Map(); // channelId -> { host, title, description, model, time, startingPrice, bids: [{user, diamonds, items}], timer, started, channelId, messageId, updateInterval }
-const finishedAuctions = new Map(); // messageId -> { host, title, winner, diamonds, items, channelId, auctionMessageId }
-const finishedGiveaways = new Map(); // messageId -> { host, winner, items, channelId }
 const trades = new Map(); // messageId -> { host, hostDiamonds, hostItems, offers: [{user, diamonds, items, timestamp}], channelId, messageId, accepted: false, acceptedUser: null }
 const inventories = new Map(); // userId -> { messageId, channelId, items, diamonds, lookingFor, robloxUsername, lastEdited }
 const userTradeCount = new Map(); // userId -> count of active trades
@@ -24,112 +21,62 @@ const giveaways = new Map(); // messageId -> { host, items: [{name, quantity}], 
 // Item categories for trades
 const itemCategories = {
   huges: {
-    'Black Hole Huges': ['HugeBlackHoleAngelus', 'HugeRainbowBlackHoleAngelus'],
-    'Snow Globe Huges': ['HugeSnowGlobeHamster', 'HugeRainbowSnowGlobeHamster', 'HugeSnowGlobeCat', 'HugeRainbowSnowGlobeCat'],
-    'Ice Cube Huges': ['HugeIceCubeGingerbreadCorgi', 'HugeRainbowIceCubeGingerbreadCorgi', 'HugeIceCubeCookieCutCat', 'HugeRainbowIceCubeCookieCutCat'],
-    'Jelly Huges': ['HugeJellyDragon', 'HugeRainbowJellyDragon', 'HugeJellyKitsune', 'HugeRainbowJellyKitsune'],
-    'Blazing Huges': ['HugeBlazingShark', 'HugeRainbowBlazingShark', 'HugeBlazingBat', 'HugeRainbowBlazingBat'],
-    'Event Huges': ['HugePartyCat', 'HugeGoldenPartyCat', 'HugeRainbowPartyCat', 'HugePartyDragon', 'HugeGoldenPartyDragon', 'HugeRainbowPartyDragon', 'HugeHellRock', 'HugeGoldenHellRock', 'HugeRainbowHellRock'],
-    'Christmas.1 Huges': ['HugePresentChestMimic', 'HugeRainbowPresentChestMimic', 'HugeGingerbreadAngelus', 'HugeGoldenGingerbreadAngelus', 'HugeRainbowGingerbreadAngelus', 'HugeNorthPoleWolf', 'HugeGoldenNorthPoleWolf', 'HugeRainbowNorthPoleWolf'],
+    'Black Hole Huges': ['HugeBlackHoleAngelus', 'HugeGoldenBlackHoleAngelus', 'HugeRainbowBlackHoleAngelus'],
+    'Snow Globe Huges': ['HugeSnowGlobeHamster', 'HugeGoldenSnowGlobeHamster', 'HugeRainbowSnowGlobeHamster', 'HugeSnowGlobeCat', 'HugeGoldenSnowGlobeCat', 'HugeRainbowSnowGlobeCat'],
+    'Ice Cube Huges': ['HugeIceCubeGingerbreadCorgi', 'HugeGoldenIceCubeGingerbreadCorgi', 'HugeRainbowIceCubeGingerbreadCorgi', 'HugeIceCubeCookieCutCat', 'HugeGoldenIceCubeCookieCutCat', 'HugeRainbowIceCubeCookieCutCat'],
+    'Jelly Huges': ['HugeJellyDragon', 'HugeGoldenJellyDragon', 'HugeRainbowJellyDragon', 'HugeJellyKitsune', 'HugeGoldenJellyKitsune', 'HugeRainbowJellyKitsune'],
+    'Blazing Huges': ['HugeBlazingShark', 'HugeGoldenBlazingShark', 'HugeRainbowBlazingShark', 'HugeBlazingBat', 'HugeGoldenBlazingBat', 'HugeRainbowBlazingBat'],
+    'Event Huges': ['HugePartyCat', 'HugeGoldenPartyCat', 'HugeRainbowPartyCat', 'HugePartyDragon', 'HugeGoldenPartyDragon', 'HugeRainbowPartyDragon', 'HugeHellRock', 'HugeGoldenHellRock', 'HugeRainbowHellRock', 'HugeNinjaCat', 'HugeGoldenNinjaCat', 'HugeRainbowNinjaCat'],
+    'Christmas.1 Huges': ['HugePresentChestMimic', 'HugeGoldenPresentChestMimic', 'HugeRainbowPresentChestMimic', 'HugeGingerbreadAngelus', 'HugeGoldenGingerbreadAngelus', 'HugeRainbowGingerbreadAngelus', 'HugeNorthPoleWolf', 'HugeGoldenNorthPoleWolf', 'HugeRainbowNorthPoleWolf'],
     'Christmas.2 Huges': ['HugeIcyPhoenix', 'HugeGoldenIcyPhoenix', 'HugeRainbowIcyPhoenix'],
-    'Map Huges': ['HugeChestMimic', 'HugeGoldenChestMimic', 'HugeRainbowChestMimic', 'HugeSorcererCat', 'HugeGoldenSorcererCat', 'HugeRainbowSorcererCat', 'HugeDominusAzureus', 'HugeGoldenDominusAzureus', 'HugeRainbowDominusAzureus','HugePropellerCat', 'HugeGoldenPropellerCat', 'HugeRainbowPropellerCat', 'HugePropellerDog', 'HugeGoldenPropellerDog', 'HugeRainbowPropellerDog', 'HugeNinjaCat', 'HugeGoldenNinjaCat', 'HugeRainbowNinjaCat', 'HugeFantasyChestMimic', 'HugeGoldenFantasyChestMimic']
+    'Map Huges': ['HugeChestMimic', 'HugeGoldenChestMimic', 'HugeRainbowChestMimic', 'HugeSorcererCat', 'HugeGoldenSorcererCat', 'HugeRainbowSorcererCat', 'HugePropellerCat', 'HugeGoldenPropellerCat', 'HugeRainbowPropellerCat', 'HugeDominusAzureus', 'HugeGoldenDominusAzureus', 'HugeRainbowDominusAzureus', 'HugePropellerDog', 'HugeGoldenPropellerDog', 'HugeRainbowPropellerDog']
   },
   exclusives: ['BlazingShark', 'BlazingGoldenShark', 'BlazingRainbowShark', 'BlazingBat', 'BlazingGoldenBat', 'BlazingRainbowBat', 'BlazingCorgi', 'BlazingGoldenCorgi', 'BlazingRainbowCorgi', 'IceCubeGingerbreadCat', 'IceCubeGoldenGingerbreadCat', 'IceCubeRainbowGingerbreadCat', 'IceCubeGingerbreadCorgi', 'IceCubeGoldenGingerbreadCorgi', 'IceCubeRainbowGingerbreadCorgi', 'IceCubeCookieCuteCat', 'IceCubeGoldenCookieCuteCat', 'IceCubeRainbowCookieCuteCat', 'SnowGlobeCat', 'SnowGlobeGoldenCat', 'SnowGlobeRainbowCat', 'SnowGlobeAxolotl', 'SnowGlobeGoldenAxolotl', 'SnowGlobeRainbowAxolotl', 'SnowGlobeHamster', 'SnowGlobeGoldenHamster', 'SnowGlobeRainbowHamster', 'JellyCat', 'JellyGoldenCat', 'JellyRainbowCat', 'JellyBunny', 'JellyGoldenBunny', 'JellyRainbowBunny', 'JellyCorgi', 'JellyGoldenCorgi', 'JellyRainbowCorgi', 'BlackHoleAxolotl', 'BlackHoleGoldenAxolotl', 'BlackHoleRainbowAxolotl', 'BlackHoleImmortuus', 'BlackHoleGoldenImmortuus', 'BlackHoleRainbowImmortuus', 'BlackHoleKitsune', 'BlackHoleGoldenKitsune', 'BlackHoleRainbowKitsune'],
-  eggs: ['HypeEgg', 'BlazingEgg', 'IceCubeEgg', 'SnowGlobeEgg', 'JellyEgg', 'BlackHoleEgg', 'UnicornEgg'],
-  gifts: ['LikeGoalLootbox', '2026LootBox', 'CastleLootbox']
+  eggs: ['HypeEgg', 'BlazingEgg', 'IceCubeEgg', 'SnowGlobeEgg', 'JellyEgg', 'BlackHoleEgg'],
+  gifts: ['LikeGoalLootbox', '2026LootBox', 'SpintheWheellootbox']
 };
 
 // Giveaway item categories (for /setupgiveaway)
 const giveawayItemCategories = {
-  diamonds: [],
   huges: {
-    'Black Hole Huges': ['HugeBlackHoleAngelus', 'HugeRainbowBlackHoleAngelus'],
-    'Snow Globe Huges': ['HugeSnowGlobeHamster', 'HugeRainbowSnowGlobeHamster', 'HugeSnowGlobeCat', 'HugeRainbowSnowGlobeCat'],
-    'Ice Cube Huges': ['HugeIceCubeGingerbreadCorgi', 'HugeRainbowIceCubeGingerbreadCorgi', 'HugeIceCubeCookieCutCat', 'HugeRainbowIceCubeCookieCutCat'],
-    'Jelly Huges': ['HugeJellyDragon', 'HugeRainbowJellyDragon', 'HugeJellyKitsune', 'HugeRainbowJellyKitsune'],
-    'Blazing Huges': ['HugeBlazingShark', 'HugeRainbowBlazingShark', 'HugeBlazingBat', 'HugeRainbowBlazingBat'],
-    'Event Huges': ['HugePartyCat', 'HugeGoldenPartyCat', 'HugeRainbowPartyCat', 'HugePartyDragon', 'HugeGoldenPartyDragon', 'HugeRainbowPartyDragon', 'HugeHellRock', 'HugeGoldenHellRock', 'HugeRainbowHellRock'],
-    'Christmas.1 Huges': ['HugePresentChestMimic', 'HugeRainbowPresentChestMimic', 'HugeGingerbreadAngelus', 'HugeGoldenGingerbreadAngelus', 'HugeRainbowGingerbreadAngelus', 'HugeNorthPoleWolf', 'HugeGoldenNorthPoleWolf', 'HugeRainbowNorthPoleWolf'],
+    'Black Hole Huges': ['HugeBlackHoleAngelus', 'HugeGoldenBlackHoleAngelus', 'HugeRainbowBlackHoleAngelus'],
+    'Snow Globe Huges': ['HugeSnowGlobeHamster', 'HugeGoldenSnowGlobeHamster', 'HugeRainbowSnowGlobeHamster', 'HugeSnowGlobeCat', 'HugeGoldenSnowGlobeCat', 'HugeRainbowSnowGlobeCat'],
+    'Ice Cube Huges': ['HugeIceCubeGingerbreadCorgi', 'HugeGoldenIceCubeGingerbreadCorgi', 'HugeRainbowIceCubeGingerbreadCorgi', 'HugeIceCubeCookieCutCat', 'HugeGoldenIceCubeCookieCutCat', 'HugeRainbowIceCubeCookieCutCat'],
+    'Jelly Huges': ['HugeJellyDragon', 'HugeGoldenJellyDragon', 'HugeRainbowJellyDragon', 'HugeJellyKitsune', 'HugeGoldenJellyKitsune', 'HugeRainbowJellyKitsune'],
+    'Blazing Huges': ['HugeBlazingShark', 'HugeGoldenBlazingShark', 'HugeRainbowBlazingShark', 'HugeBlazingBat', 'HugeGoldenBlazingBat', 'HugeRainbowBlazingBat'],
+    'Event Huges': ['HugePartyCat', 'HugeGoldenPartyCat', 'HugeRainbowPartyCat', 'HugePartyDragon', 'HugeGoldenPartyDragon', 'HugeRainbowPartyDragon', 'HugeHellRock', 'HugeGoldenHellRock', 'HugeRainbowHellRock', 'HugeNinjaCat', 'HugeGoldenNinjaCat', 'HugeRainbowNinjaCat'],
+    'Christmas.1 Huges': ['HugePresentChestMimic', 'HugeGoldenPresentChestMimic', 'HugeRainbowPresentChestMimic', 'HugeGingerbreadAngelus', 'HugeGoldenGingerbreadAngelus', 'HugeRainbowGingerbreadAngelus', 'HugeNorthPoleWolf', 'HugeGoldenNorthPoleWolf', 'HugeRainbowNorthPoleWolf'],
     'Christmas.2 Huges': ['HugeIcyPhoenix', 'HugeGoldenIcyPhoenix', 'HugeRainbowIcyPhoenix'],
-    'Map Huges': ['HugeChestMimic', 'HugeGoldenChestMimic', 'HugeRainbowChestMimic', 'HugeSorcererCat', 'HugeGoldenSorcererCat', 'HugeRainbowSorcererCat', 'HugeDominusAzureus', 'HugeGoldenDominusAzureus', 'HugeRainbowDominusAzureus','HugePropellerCat', 'HugeGoldenPropellerCat', 'HugeRainbowPropellerCat', 'HugePropellerDog', 'HugeGoldenPropellerDog', 'HugeRainbowPropellerDog', 'HugeNinjaCat', 'HugeGoldenNinjaCat', 'HugeRainbowNinjaCat', 'HugeFantasyChestMimic', 'HugeGoldenFantasyChestMimic']
+    'Map Huges': ['HugeChestMimic', 'HugeGoldenChestMimic', 'HugeRainbowChestMimic', 'HugeSorcererCat', 'HugeGoldenSorcererCat', 'HugeRainbowSorcererCat', 'HugePropellerCat', 'HugeGoldenPropellerCat', 'HugeRainbowPropellerCat', 'HugeDominusAzureus', 'HugeGoldenDominusAzureus', 'HugeRainbowDominusAzureus', 'HugePropellerDog', 'HugeGoldenPropellerDog', 'HugeRainbowPropellerDog']
   },
   exclusives: ['BlazingShark', 'BlazingGoldenShark', 'BlazingRainbowShark', 'BlazingBat', 'BlazingGoldenBat', 'BlazingRainbowBat', 'BlazingCorgi', 'BlazingGoldenCorgi', 'BlazingRainbowCorgi', 'IceCubeGingerbreadCat', 'IceCubeGoldenGingerbreadCat', 'IceCubeRainbowGingerbreadCat', 'IceCubeGingerbreadCorgi', 'IceCubeGoldenGingerbreadCorgi', 'IceCubeRainbowGingerbreadCorgi', 'IceCubeCookieCuteCat', 'IceCubeGoldenCookieCuteCat', 'IceCubeRainbowCookieCuteCat', 'SnowGlobeCat', 'SnowGlobeGoldenCat', 'SnowGlobeRainbowCat', 'SnowGlobeAxolotl', 'SnowGlobeGoldenAxolotl', 'SnowGlobeRainbowAxolotl', 'SnowGlobeHamster', 'SnowGlobeGoldenHamster', 'SnowGlobeRainbowHamster', 'JellyCat', 'JellyGoldenCat', 'JellyRainbowCat', 'JellyBunny', 'JellyGoldenBunny', 'JellyRainbowBunny', 'JellyCorgi', 'JellyGoldenCorgi', 'JellyRainbowCorgi', 'BlackHoleAxolotl', 'BlackHoleGoldenAxolotl', 'BlackHoleRainbowAxolotl', 'BlackHoleImmortuus', 'BlackHoleGoldenImmortuus', 'BlackHoleRainbowImmortuus', 'BlackHoleKitsune', 'BlackHoleGoldenKitsune', 'BlackHoleRainbowKitsune'],
-  eggs: ['HypeEgg', 'BlazingEgg', 'IceCubeEgg', 'SnowGlobeEgg', 'JellyEgg', 'BlackHoleEgg', 'UnicornEgg'],
-  gifts: ['LikeGoalLootbox', '2026LootBox', 'CastleLootbox']
+  eggs: ['HypeEgg', 'BlazingEgg', 'IceCubeEgg', 'SnowGlobeEgg', 'JellyEgg', 'BlackHoleEgg'],
+  gifts: ['LikeGoalLootbox', '2026LootBox', 'SpintheWheellootbox']
 };
 
 // Item emojis mapping - customize with your server emojis
 const itemEmojis = {
-  //Huges
-  'HugeBlackHoleAngelus': '<:HugeBlackHoleAngelus:1461868865758695646>',
-  //'HugeRainbowBlackHoleAngelus': '<:HugeRainbowBlackHoleAngelus:0000000000000000000>',
+  'HugeBlackHoleAngelus': '<:HugeBlackHoleAngelus:1461512580970618881>',
+  'HugeGoldenBlackHoleAngelus': '<:HugeGoldenBlackHoleAngelus:1461512580970618881>',
+  'HugeRainbowBlackHoleAngelus': '<:HugeRainbowBlackHoleAngelus:1461512580970618881>',
   'HugeSnowGlobeHamster': '<:HugeSnowGlobeHamster:1461512580970618881>',
-  //'HugeRainbowSnowGlobeHamster': '<:HugeRainbowSnowGlobeHamster:0000000000000000000>',
-  'HugeSnowGlobeCat': '<:HugeSnowGlobeCat:1462107033728975075>',
-  //'HugeRainbowSnowGlobeCat': '<:HugeRainbowSnowGlobeCat:0000000000000000000>',
-  'HugeIceCubeGingerbreadCorgi': '<:HugeIceCubeGingerbreadCorgi:1462106451693535325>',
-  //'HugeRainbowIceCubeGingerbreadCorgi': '<:HugeRainbowIceCubeGingerbreadCorgi:0000000000000000000>',
-  'HugeIceCubeCookieCutCat': '<:HugeIceCubeCookieCutCat:1462116814019493929>',
-  //'HugeRainbowIceCubeCookieCutCat': '<:HugeRainbowIceCubeCookieCutCat:0000000000000000000>',
-  'HugeJellyDragon': '<:HugeJellyDragon:1462106322916081664>',
-  //'HugeRainbowJellyDragon': '<:HugeRainbowJellyDragon:0000000000000000000>',
-  'HugeJellyKitsune': '<:HugeJellyKitsune:1462106866120397087>',
-  //'HugeRainbowJellyKitsune': '<:HugeRainbowJellyKitsune:0000000000000000000>',
-  'HugeBlazingShark': '<:HugeBlazingShark:1462106957703024752>',
-  //'HugeRainbowBlazingShark': '<:HugeRainbowBlazingShark:0000000000000000000>',
-  'HugeBlazingBat': '<:HugeBlazingBat:1462106694598266981>',
-  //'HugeRainbowBlazingBat': '<:HugeRainbowBlazingBat:0000000000000000000>',
-  'HugePartyCat': '<:HugePartyCat:1462106369648889866>',
-  'HugeGoldenPartyCat': '<:HugeGoldenPartyCat:1462114372070543402>',
-  'HugePartyDragon': '<:HugePartyDragon:1462107505734975518>',
-  'HugeGoldenPartyDragon': '<:HugeGoldenPartyDragon:1462107566803779606>',
-  'HugeHellRock': '<:HugeHellRock:1462107622457999381>',
-  'HugeGoldenHellRock': '<:HugeGoldenHellRock:1462106790719258968>',
-  //'HugeRainbowHellRock': '<:HugeRainbowHellRock:0000000000000000000>',
-  'HugeNinjaCat': '<:HugeNinjaCat:1462106737162064016>',
-  'HugeGoldenNinjaCat': '<:HugeGoldenNinjaCat:1462106917483708538>',
-  //'HugeRainbowNinjaCat': '<:HugeRainbowNinjaCat:0000000000000000000>',
-  'HugePresentChestMimic': '<:HugePresentChestMimic:1462107065790107842>',
-  //'HugeRainbowPresentChestMimic': '<:HugeRainbowPresentChestMimic:0000000000000000000>',
-  'HugeGingerbreadAngelus': '<:HugeGingerbreadAngelus:1462107378961875197>',
-  'HugeGoldenGingerbreadAngelus': '<:HugeGoldenGingerbreadAngelus:1462107417327173859>',
-  //'HugeRainbowGingerbreadAngelus': '<:HugeRainbowGingerbreadAngelus:0000000000000000000>',
-  'HugeNorthPoleWolf': '<:HugeNorthPoleWolf:1462107345613095054>',
-  'HugeGoldenNorthPoleWolf': '<:HugeGoldenNorthPoleWolf:1462107307688329319>',
-  'HugeIcyPhoenix': '<:HugeIcyPhoenix:1462107213526077675>',
-  'HugeGoldenIcyPhoenix': '<:HugeGoldenIcyPhoenix:1462107251647975566>',
-  'HugeChestMimic': '<:HugeChestMimic:1462108260604838083>',
-  'HugeGoldenChestMimic': '<:HugeGoldenChestMimic:1462114353871589569>',
-  'HugeSorcererCat': '<:HugeSorcererCat:1462106995283853533>',
-  'HugeGoldenSorcererCat': '<:HugeGoldenSorcererCat:1462114333273100433>',
-  'HugePropellerCat': '<:HugePropellerCat:1462106600620953711>',
-  'HugeGoldenPropellerCat': '<:HugeGoldenPropellerCat:1462114394673643631>',
-  //'HugeRainbowPropellerCat': '<:HugeRainbowPropellerCat:0000000000000000000>',
-  'HugePropellerDog': '<:HugePropellerDog:1462185444837036105>',
-  'HugeGoldenPropellerDog': '<:HugeGoldenPropellerDog:1462185464680157367>',
-  'HugeDominusAzureus': '<:HugeDominusAzureus:1462106645466185833>',
-  'HugeGoldenDominusAzureus': '<:HugeGoldenDominusAzureus:1462114314390343760>',
-  'HugeFantasyChestMimic': '<:HugeFantasyChestMimic:1462166275685093553>',
-  'HugeGoldenFantasyChestMimic': '<:HugeGoldenFantasyChestMimic:1462166252020568096>',
-
-  // Eggs
-  'HypeEgg': '<:HypeEgg:1462107877085806632>',
-  'BlazingEgg': '<:BlazingEgg:1462120052743606344>',
-  'IceCubeEgg': '<:IceCubeEgg:1462108156061683945>',
-  'SnowGlobeEgg': '<:SnowGlobeEgg:1462108029347692741>',
-  'JellyEgg': '<:JellyEgg:1462107816234979338>',
-  'BlackHoleEgg': '<:BlackHoleEgg:1462107779081961483>',
-  //'UnicornEgg': '<:UnicornEgg:0000000000000000000>',
-
-  // Gifts
-  'LikeGoalLootbox': '<:LikeGoalLootbox:1462108111383957833>',
-  '2026LootBox': '<:2026LootBox:1462114273827491883>',
-  'CastleLootbox': '<:CastleLootbox:1462120075762077716>',
+  'HugeGoldenSnowGlobeHamster': '<:HugeGoldenSnowGlobeHamster:1461512580970618881>',
+  'HugeRainbowSnowGlobeHamster': '<:HugeRainbowSnowGlobeHamster:1461512580970618881>',
+  'HugeSnowGlobeCat': '<:HugeSnowGlobeCat:1461512580970618881>',
+  'HugeGoldenSnowGlobeCat': '<:HugeGoldenSnowGlobeCat:1461512580970618881>',
+  'HugeRainbowSnowGlobeCat': '<:HugeRainbowSnowGlobeCat:1461512580970618881>',
+  'HugeIceCubeGingerbreadCorgi': '<:HugeIceCubeGingerbreadCorgi:1461512580970618881>',
+  'HugeGoldenIceCubeGingerbreadCorgi': '<:HugeGoldenIceCubeGingerbreadCorgi:1461512580970618881>',
+  'HugeRainbowIceCubeGingerbreadCorgi': '<:HugeRainbowIceCubeGingerbreadCorgi:1461512580970618881>',
+  'HugeIceCubeCookieCutCat': '<:HugeIceCubeCookieCutCat:1461512580970618881>',
+  'HugeGoldenIceCubeCookieCutCat': '<:HugeGoldenIceCubeCookieCutCat:1461512580970618881>',
+  'HugeRainbowIceCubeCookieCutCat': '<:HugeRainbowIceCubeCookieCutCat:1461512580970618881>',
+  // Add more emojis as needed - format: 'ItemName': '<:ItemName:ID>'
 };
 
 // Helper functions
 function getItemEmoji(itemName) {
-  return itemEmojis[itemName] || undefined;
+  return itemEmojis[itemName] || '';
 }
 
 function formatItemName(itemName) {
@@ -146,37 +93,14 @@ function formatItemsText(items) {
   
   return items.map(item => {
     if (typeof item === 'object') {
-      // Special handling for Diamonds - use formatBid for abbreviations
-      if (item.name === '💎 Diamonds') {
-        const abbreviatedValue = formatBid(item.quantity);
-        return `💎 **Diamonds** (**${abbreviatedValue} 💎**)`;
-      }
-      
-      const emoji = getItemEmoji(item.name) || '';
+      const emoji = getItemEmoji(item.name);
       const formattedName = formatItemName(item.name);
       return `${emoji} **${formattedName}** (**x${item.quantity}**)`;
     } else {
-      const emoji = getItemEmoji(item) || '';
+      const emoji = getItemEmoji(item);
       const formattedName = formatItemName(item);
       return `${emoji} **${formattedName}**`;
     }
-  }).join('\n');
-}
-
-// Helper function to format items list with emoji and abbreviations
-function formatItemsList(items) {
-  if (!items || items.length === 0) return 'None';
-  
-  return items.map(item => {
-    // Special handling for Diamonds - use formatBid for abbreviations
-    if (item.name === '💎 Diamonds') {
-      const abbreviatedValue = formatBid(item.quantity);
-      return `💎 **Diamonds** (${abbreviatedValue} 💎)`;
-    }
-    
-    const emoji = getItemEmoji(item.name) || '';
-    const formattedName = formatItemName(item.name);
-    return `${emoji} **${formattedName}** (x${item.quantity})`;
   }).join('\n');
 }
 
@@ -190,7 +114,6 @@ function saveData() {
     redirectChannelId,
     redirectTradeChannelId,
     redirectInventoryChannelId,
-    redirectGiveawayChannelId,
     inventories: Array.from(inventories.entries())
   };
   
@@ -205,7 +128,6 @@ function loadData() {
       if (data.redirectChannelId) redirectChannelId = data.redirectChannelId;
       if (data.redirectTradeChannelId) redirectTradeChannelId = data.redirectTradeChannelId;
       if (data.redirectInventoryChannelId) redirectInventoryChannelId = data.redirectInventoryChannelId;
-      if (data.redirectGiveawayChannelId) redirectGiveawayChannelId = data.redirectGiveawayChannelId;
       
       if (data.inventories) {
         data.inventories.forEach(([key, value]) => {
@@ -401,44 +323,11 @@ client.on('messageCreate', async (message) => {
         return message.reply('❌ Auction proof channel not found.');
       }
 
-      // Get auction info from finishedAuctions Map
-      const auctionData = finishedAuctions.get(proofData.auctionProofMessageId);
-      
-      if (!auctionData) {
-        delete message.author.waitingForProof;
-        return message.reply('❌ Auction no longer exists.');
-      }
-
       // Create proof embed for auction
       proofEmbed = new EmbedBuilder()
         .setTitle('🎪 Auction Proof')
-        .setDescription(`**Title:** ${auctionData.title}\n**Host:** ${auctionData.host}\n**Winner:** ${auctionData.winner}\n**Bid:** ${auctionData.diamonds} 💎\n\n**Note:** ${proofData.description || 'No description provided'}`)
+        .setDescription(`**Winner:** ${message.author}\n\n**Note:** ${proofData.description || 'No description provided'}`)
         .setColor(0x00ff00)
-        .setImage(attachment.url)
-        .setFooter({ text: `Submitted by ${message.author.username}` })
-        .setTimestamp();
-    } else if (proofData.type === 'giveaway') {
-      const giveawayProofChannelId = '1462197194646880368';
-      proofChannel = guild.channels.cache.get(giveawayProofChannelId);
-
-      if (!proofChannel) {
-        delete message.author.waitingForProof;
-        return message.reply('❌ Giveaway proof channel not found.');
-      }
-
-      // Get giveaway info from finishedGiveaways Map
-      const giveawayData = finishedGiveaways.get(proofData.giveawayProofMessageId);
-      
-      if (!giveawayData) {
-        delete message.author.waitingForProof;
-        return message.reply('❌ Giveaway no longer exists.');
-      }
-
-      // Create proof embed for giveaway
-      proofEmbed = new EmbedBuilder()
-        .setTitle('🎁 Giveaway Proof')
-        .setDescription(`**Host:** ${giveawayData.host}\n**Winner:** ${giveawayData.winner}\n\n**Note:** ${proofData.description || 'No description provided'}`)
-        .setColor(0xFF1493)
         .setImage(attachment.url)
         .setFooter({ text: `Submitted by ${message.author.username}` })
         .setTimestamp();
@@ -505,31 +394,6 @@ function formatBid(num) {
   return num.toString();
 }
 
-function parseDuration(str) {
-  str = str.toString().trim().toLowerCase();
-  
-  // Check for time units
-  const secondsMatch = str.match(/^(\d+(?:\.\d+)?)\s*s$/);
-  const minutesMatch = str.match(/^(\d+(?:\.\d+)?)\s*m$/);
-  const hoursMatch = str.match(/^(\d+(?:\.\d+)?)\s*h$/);
-  
-  let minutes = 0;
-  
-  if (secondsMatch) {
-    const seconds = parseFloat(secondsMatch[1]);
-    minutes = Math.ceil(seconds / 60);
-  } else if (minutesMatch) {
-    minutes = Math.ceil(parseFloat(minutesMatch[1]));
-  } else if (hoursMatch) {
-    minutes = Math.ceil(parseFloat(hoursMatch[1]) * 60);
-  } else {
-    // If no unit, assume it's minutes
-    minutes = parseInt(str);
-  }
-  
-  return minutes;
-}
-
 client.on('interactionCreate', async (interaction) => {
   if (interaction.isCommand()) {
     const { commandName } = interaction;
@@ -566,32 +430,30 @@ client.on('interactionCreate', async (interaction) => {
         await interaction.deferReply({ ephemeral: true });
 
         const versionFile = require('./version.json');
+        const currentVersion = versionFile.version || '1.0.9';
 
-        // Define embeds to update with their respective version keys
+        // Define embeds to update
         const categoriesToUpdate = [
           {
             title: 'Auction System Setup',
             color: 0x00ff00,
             description: 'Welcome to the live auction system!\n\n**How it works:**\n- Auctions are held per channel to avoid conflicts.\n- Bidding can be done via text (e.g., "bid 10000") or slash commands.\n- The auction ends automatically after the set time, or can be ended early.\n- Winner is the highest bidder (diamonds first, then first bid if tie).\n\nClick the button below to create a new auction.',
             customId: 'create_auction',
-            buttonLabel: 'Create Auction',
-            versionKey: 'auction'
+            buttonLabel: 'Create Auction'
           },
           {
             title: 'Trade System Setup',
             color: 0x0099ff,
             description: 'Welcome to the live trade system!\n\n**How it works:**\n- Create a trade offer with items or diamonds.\n- Other users can place their offers in response.\n- Host can accept or decline offers.\n- Once accepted, both users are notified.\n\nClick the button below to create a new trade.',
             customId: 'create_trade',
-            buttonLabel: 'Create Trade',
-            versionKey: 'trade'
+            buttonLabel: 'Create Trade'
           },
           {
             title: '📦 Inventory System Setup',
             color: 0x00a8ff,
             description: 'Welcome to the inventory system!\n\n**How it works:**\n- Create your personal inventory with items you have in stock.\n- Set your diamond amount and describe what you\'re looking for.\n- Optionally add your Roblox username to display your avatar.\n- Other users can see your inventory and make offers!\n- Update anytime - your previous items stay saved if you don\'t remove them.\n\nClick the button below to create or edit your inventory.',
             customId: 'create_inventory',
-            buttonLabel: 'Create Inventory',
-            versionKey: 'inventory'
+            buttonLabel: 'Create Inventory'
           }
         ];
 
@@ -600,9 +462,6 @@ client.on('interactionCreate', async (interaction) => {
 
         for (const category of categoriesToUpdate) {
           try {
-            // Get version from version.json for this category
-            const version = versionFile[category.versionKey] || '1.0.0';
-
             // Search for messages with this embed title in all channels
             const channels = interaction.guild.channels.cache.filter(c => c.isTextBased());
             
@@ -619,7 +478,7 @@ client.on('interactionCreate', async (interaction) => {
                         .setTitle(category.title)
                         .setDescription(category.description)
                         .setColor(category.color)
-                        .setFooter({ text: `Version ${version} | Made By Atlas` })
+                        .setFooter({ text: `Version ${currentVersion} | Made By Atlas` })
                         .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
                       const row = new ActionRowBuilder()
@@ -648,9 +507,9 @@ client.on('interactionCreate', async (interaction) => {
 
         const updateEmbed = new EmbedBuilder()
           .setTitle('✅ Embeds Updated')
-          .setDescription(`**Update Summary:**\n- ✅ Successfully updated: ${updatedCount} embed(s)\n- ❌ Failed: ${failedCount} embed(s)\n\n**Versions Applied:**\n- 🎪 Auction: v${versionFile.auction || '1.0.0'}\n- 🔄 Trade: v${versionFile.trade || '1.0.0'}\n- 📦 Inventory: v${versionFile.inventory || '1.0.0'}`)
+          .setDescription(`**Update Summary:**\n- ✅ Successfully updated: ${updatedCount} embed(s)\n- ❌ Failed: ${failedCount} embed(s)\n\n**Updated Version:** ${currentVersion}`)
           .setColor(0x00ff00)
-          .setFooter({ text: `Last Updated: ${versionFile.lastUpdated || new Date().toISOString()} | Made By Atlas` });
+          .setFooter({ text: `Version ${currentVersion} | Made By Atlas` });
 
         await interaction.editReply({ embeds: [updateEmbed] });
       } catch (error) {
@@ -1213,79 +1072,23 @@ client.on('interactionCreate', async (interaction) => {
       const giveaway = giveaways.get(messageId);
       if (!giveaway) return interaction.reply({ content: 'Giveaway not found.', ephemeral: true });
 
-      // Check if user is the giveaway host
-      if (giveaway.host.id === interaction.user.id) {
-        return interaction.reply({ content: '❌ You can\'t enter your own raffle!', ephemeral: true });
-      }
-
       // Check if user already entered
       const alreadyEntered = giveaway.entries.some(entry => entry.user.id === interaction.user.id);
       if (alreadyEntered) {
         return interaction.reply({ content: 'You are already entered in this giveaway!', ephemeral: true });
       }
 
-      // Check if user has special role for x2 entries
-      const specialRoleId = '1461534174589485197';
-      const hasSpecialRole = interaction.member.roles.cache.has(specialRoleId);
-      const entryCount = hasSpecialRole ? 2 : 1;
+      // Add entry
+      giveaway.entries.push({
+        user: interaction.user,
+        enteredAt: Date.now()
+      });
 
-      // Add entry(ies)
-      for (let i = 0; i < entryCount; i++) {
-        giveaway.entries.push({
-          user: interaction.user,
-          enteredAt: Date.now(),
-          multiplier: hasSpecialRole ? 2 : 1
-        });
-      }
-
-      const message = hasSpecialRole 
-        ? `✅ You have entered the giveaway with **x2 entries** due to your special role! Total entries: ${giveaway.entries.length}`
-        : `✅ You have entered the giveaway! Total entries: ${giveaway.entries.length}`;
-
-      await interaction.reply({ content: message, ephemeral: true });
-    }
-
-    if (interaction.customId.startsWith('giveaway_entries_')) {
-      const messageId = interaction.customId.replace('giveaway_entries_', '');
-      const giveaway = giveaways.get(messageId);
-      if (!giveaway) return interaction.reply({ content: 'Giveaway not found.', ephemeral: true });
-
-      // Create entries list
-      let entriesList = 'No entries yet.';
-      if (giveaway.entries.length > 0) {
-        // Group entries by user to show multipliers
-        const userEntries = {};
-        giveaway.entries.forEach((entry) => {
-          if (!userEntries[entry.user.id]) {
-            userEntries[entry.user.id] = {
-              user: entry.user,
-              count: 0,
-              multiplier: entry.multiplier || 1
-            };
-          }
-          userEntries[entry.user.id].count++;
-        });
-        
-        entriesList = Object.values(userEntries)
-          .map((data, idx) => {
-            const userDisplay = data.user.displayName || data.user.username;
-            const multiplierText = data.multiplier === 2 ? ' (x2)' : '';
-            return `${idx + 1}. ${userDisplay}${multiplierText}`;
-          })
-          .join('\n');
-      }
-
-      const entriesEmbed = new EmbedBuilder()
-        .setTitle('🎁 Giveaway Entries')
-        .setDescription(entriesList)
-        .setColor(0xFF1493)
-        .setFooter({ text: `Total: ${giveaway.entries.length} ${giveaway.entries.length === 1 ? 'entry' : 'entries'}` });
-
-      await interaction.reply({ embeds: [entriesEmbed], ephemeral: true });
+      await interaction.reply({ content: `✅ You have entered the giveaway! Total entries: ${giveaway.entries.length}`, ephemeral: true });
     }
 
     if (interaction.customId.startsWith('giveaway_end_')) {
-      const messageId = interaction.customId.replace('giveaway_end_', '');
+      const messageId = interaction.message.id;
       const giveaway = giveaways.get(messageId);
       if (!giveaway) return interaction.reply({ content: 'Giveaway not found.', ephemeral: true });
 
@@ -1295,140 +1098,66 @@ client.on('interactionCreate', async (interaction) => {
         if (!hasAdminRole) return interaction.reply({ content: 'Only the host or admin can end the giveaway.', ephemeral: true });
       }
 
-      // Clear update interval
-      if (giveaway.updateInterval) {
-        clearInterval(giveaway.updateInterval);
-      }
+      // Clear timers
+      if (giveaway.updateInterval) clearInterval(giveaway.updateInterval);
+      if (giveaway.timer) clearTimeout(giveaway.timer);
 
-      // Update the original giveaway embed to show "Ended by host"
+      const channel = interaction.guild.channels.cache.get(giveaway.channelId);
+      
+      // Delete the giveaway message
       try {
-        const channel = interaction.guild.channels.cache.get(giveaway.channelId);
-        if (channel) {
-          const message = await channel.messages.fetch(messageId);
-          if (message) {
-            const endedEmbed = new EmbedBuilder()
-              .setTitle('🎁 Giveaway')
-              .setDescription(giveaway.description ? `**${giveaway.description}**\n\n**Ended by host**` : '**Ended by host**')
-              .setColor(0xFF0000) // Red color
-              .setFooter({ text: 'Version 1.0.9 | Made By Atlas' })
-              .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
-
-            const giveawayItemsText = formatItemsText(giveaway.items);
-
-            endedEmbed.addFields({
-              name: 'Giveaway Items',
-              value: giveawayItemsText,
-              inline: false
-            });
-
-            endedEmbed.addFields({
-              name: 'Hosted by',
-              value: giveaway.host.toString(),
-              inline: false
-            });
-
-            endedEmbed.addFields({
-              name: 'Status',
-              value: 'Ended by host',
-              inline: false
-            });
-
-            // Disable all buttons
-            const disabledRow = new ActionRowBuilder().addComponents(
-              new ButtonBuilder()
-                .setCustomId('disabled_enter')
-                .setLabel('Enter Giveaway')
-                .setStyle(ButtonStyle.Success)
-                .setDisabled(true),
-              new ButtonBuilder()
-                .setCustomId('disabled_entries')
-                .setLabel(`${giveaway.entries.length} ${giveaway.entries.length === 1 ? 'Entry' : 'Entries'}`)
-                .setStyle(ButtonStyle.Secondary)
-                .setDisabled(true),
-              new ButtonBuilder()
-                .setCustomId('disabled_end')
-                .setLabel('End Giveaway')
-                .setStyle(ButtonStyle.Danger)
-                .setDisabled(true)
-            );
-
-            await message.edit({ embeds: [endedEmbed], components: [disabledRow] });
-          }
-        }
-      } catch (error) {
-        console.error('Error updating giveaway embed:', error);
+        const msg = await channel.messages.fetch(messageId);
+        await msg.delete();
+      } catch (e) {
+        // Message might have been deleted already
       }
 
       if (giveaway.entries.length === 0) {
-        giveaways.delete(messageId);
-        // Decrement giveaway count for host
-        const hostId = giveaway.host.id;
-        userGiveawayCount.set(hostId, Math.max(0, (userGiveawayCount.get(hostId) || 1) - 1));
-        return interaction.reply({ content: 'Giveaway ended with no entries.', ephemeral: true });
+        if (channel) await channel.send('Giveaway ended with no entries.');
+      } else {
+        // Select random winner
+        const randomIndex = Math.floor(Math.random() * giveaway.entries.length);
+        const winner = giveaway.entries[randomIndex];
+
+        // Create winner embed
+        const embed = new EmbedBuilder()
+          .setTitle('🎁 Giveaway Ended!')
+          .setColor(0xFF1493)
+          .setDescription(`**Winner:** ${winner.user}`)
+          .setFooter({ text: 'Version 1.0.9 | Made By Atlas' });
+
+        // List items
+        let itemsText = 'None';
+        if (giveaway.items.length > 0) {
+          itemsText = giveaway.items.map(item => 
+            typeof item === 'object' ? `${item.name} x${item.quantity}` : item
+          ).join('\n');
+        }
+
+        embed.addFields({
+          name: 'Giveaway Items',
+          value: itemsText,
+          inline: false
+        });
+
+        embed.addFields({
+          name: 'Total Entries',
+          value: giveaway.entries.length.toString(),
+          inline: true
+        });
+
+        if (channel) {
+          await channel.send({ embeds: [embed] });
+          await channel.send(`🎉 Congratulations ${winner.user}! You won the giveaway!`);
+        }
       }
-
-      // Select random winner
-      const randomIndex = Math.floor(Math.random() * giveaway.entries.length);
-      const winner = giveaway.entries[randomIndex];
-
-      // Create winner embed
-      const embed = new EmbedBuilder()
-        .setTitle('🎁 Giveaway Ended!')
-        .setColor(0xFF1493)
-        .setDescription(`**Winner:** ${winner.user}`)
-        .setFooter({ text: 'Version 1.0.9 | Made By Atlas' });
-
-      // List items
-      let itemsText = 'None';
-      if (giveaway.items.length > 0) {
-        itemsText = giveaway.items.map(item => 
-          typeof item === 'object' ? `${item.name} x${item.quantity}` : item
-        ).join('\n');
-      }
-
-      embed.addFields({
-        name: 'Giveaway Items',
-        value: itemsText,
-        inline: false
-      });
-
-      embed.addFields({
-        name: 'Total Entries',
-        value: giveaway.entries.length.toString(),
-        inline: true
-      });
-
-      // Add Upload Proof Image button
-      const proofButton = new ButtonBuilder()
-        .setCustomId(`upload_proof_giveaway_${Date.now()}`)
-        .setLabel('Upload Proof Image')
-        .setStyle(ButtonStyle.Primary);
-
-      const row = new ActionRowBuilder().addComponents(proofButton);
-
-      const channel = interaction.guild.channels.cache.get(giveaway.channelId);
-      const proofMessage = await channel.send({ embeds: [embed], components: [row] });
-
-      // Store finished giveaway data for proof handler
-      finishedGiveaways.set(proofMessage.id, {
-        host: giveaway.host,
-        winner: winner.user,
-        items: giveaway.items,
-        channelId: giveaway.channelId,
-        giveawayChannelId: '1462197194646880368'
-      });
-
-      // Notify winner
-      await channel.send(`🎉 Congratulations ${winner.user}! You won the giveaway!`);
 
       // Decrement giveaway count for host
       const hostId = giveaway.host.id;
       userGiveawayCount.set(hostId, Math.max(0, (userGiveawayCount.get(hostId) || 1) - 1));
-      
-      // Delete giveaway
+
       giveaways.delete(messageId);
-      
-      await interaction.reply({ content: 'Giveaway ended!', ephemeral: true });
+      await interaction.reply({ content: 'Giveaway ended! Winner selected.', ephemeral: true });
     }
 
     if (interaction.customId === 'create_auction') {
@@ -1568,7 +1297,6 @@ client.on('interactionCreate', async (interaction) => {
         .setCustomId('giveaway_category_select')
         .setPlaceholder('Select an item category')
         .addOptions([
-          { label: 'Diamonds', value: 'diamonds', emoji: '💎' },
           { label: 'Huges', value: 'huges', emoji: '🔥' },
           { label: 'Exclusives', value: 'exclusives', emoji: '✨' },
           { label: 'Eggs', value: 'eggs', emoji: '🥚' },
@@ -1716,35 +1444,6 @@ client.on('interactionCreate', async (interaction) => {
         .setLabel('Description (optional)')
         .setStyle(TextInputStyle.Paragraph)
         .setPlaceholder('Add any notes about this auction...')
-        .setRequired(false);
-
-      const row = new ActionRowBuilder().addComponents(descriptionInput);
-      modal.addComponents(row);
-
-      await interaction.showModal(modal);
-    }
-
-    if (interaction.customId.startsWith('upload_proof_giveaway_')) {
-      // Get giveaway data
-      const messageId = interaction.message.id;
-      const giveawayData = finishedGiveaways.get(messageId);
-      if (!giveawayData) return interaction.reply({ content: 'Giveaway not found.', ephemeral: true });
-
-      // Check if user is host or winner
-      if (giveawayData.host.id !== interaction.user.id && giveawayData.winner.id !== interaction.user.id) {
-        return interaction.reply({ content: 'Only the host or winner can upload proof.', ephemeral: true });
-      }
-
-      // Show modal for image description
-      const modal = new ModalBuilder()
-        .setCustomId('proof_image_modal_giveaway')
-        .setTitle('Upload Proof Image');
-
-      const descriptionInput = new TextInputBuilder()
-        .setCustomId('proof_description')
-        .setLabel('Description (optional)')
-        .setStyle(TextInputStyle.Paragraph)
-        .setPlaceholder('Add any notes about this giveaway...')
         .setRequired(false);
 
       const row = new ActionRowBuilder().addComponents(descriptionInput);
@@ -2151,7 +1850,10 @@ client.on('interactionCreate', async (interaction) => {
 
         const row = new ActionRowBuilder().addComponents(continueSelect);
         
-        const itemsList = formatItemsList(items);
+        let itemsList = '';
+        items.forEach(item => {
+          itemsList += `${item.name} x${item.quantity}\n`;
+        });
 
         await interaction.reply({ 
           content: `**Selected Items:**\n${itemsList}\n\nWhat would you like to do?`,
@@ -2276,7 +1978,10 @@ client.on('interactionCreate', async (interaction) => {
 
         const row = new ActionRowBuilder().addComponents(continueSelect);
         
-        const itemsList = formatItemsList(items);
+        let itemsList = '';
+        items.forEach(item => {
+          itemsList += `${item.name} x${item.quantity}\n`;
+        });
 
         await interaction.reply({ 
           content: `**Selected Items:**\n${itemsList}\n\nWhat would you like to do?`,
@@ -2296,7 +2001,6 @@ client.on('interactionCreate', async (interaction) => {
           .setCustomId('giveaway_category_select')
           .setPlaceholder('Select another item category')
           .addOptions([
-            { label: 'Diamonds', value: 'diamonds', emoji: '💎' },
             { label: 'Huges', value: 'huges', emoji: '🔥' },
             { label: 'Exclusives', value: 'exclusives', emoji: '✨' },
             { label: 'Eggs', value: 'eggs', emoji: '🥚' },
@@ -2320,9 +2024,9 @@ client.on('interactionCreate', async (interaction) => {
 
         const durationInput = new TextInputBuilder()
           .setCustomId('gwa_duration')
-          .setLabel('Duration (max 24 hours / 86400 seconds)')
+          .setLabel('Duration (in minutes, max 1440 = 24 hours)')
           .setStyle(TextInputStyle.Short)
-          .setPlaceholder('e.g., 60m, 1h, 3600s, or 1440')
+          .setPlaceholder('e.g., 60 for 1 hour, 1440 for 24 hours')
           .setMinLength(1)
           .setMaxLength(4)
           .setRequired(true);
@@ -2395,7 +2099,10 @@ client.on('interactionCreate', async (interaction) => {
 
         const row = new ActionRowBuilder().addComponents(continueSelect);
         
-        const itemsList = formatItemsList(items);
+        let itemsList = '';
+        items.forEach(item => {
+          itemsList += `${item.name} x${item.quantity}\n`;
+        });
 
         await interaction.reply({ 
           content: `**Selected Items:**\n${itemsList}\n\nWhat would you like to do?`,
@@ -2508,26 +2215,6 @@ client.on('interactionCreate', async (interaction) => {
       const category = interaction.values[0];
       const { StringSelectMenuBuilder } = require('discord.js');
       
-      if (category === 'diamonds') {
-        // Show modal for diamonds input
-        const diamondsModal = new ModalBuilder()
-          .setCustomId('giveaway_diamonds_modal')
-          .setTitle('Add Diamonds to Giveaway');
-
-        const diamondsInput = new TextInputBuilder()
-          .setCustomId('giveaway_diamonds_amount')
-          .setLabel('Amount of Diamonds')
-          .setStyle(TextInputStyle.Short)
-          .setPlaceholder('e.g., 5000, 10K, 1M')
-          .setRequired(true);
-
-        const row1 = new ActionRowBuilder().addComponents(diamondsInput);
-        diamondsModal.addComponents(row1);
-
-        await interaction.showModal(diamondsModal);
-        return;
-      }
-      
       if (category === 'huges') {
         const subcategorySelect = new StringSelectMenuBuilder()
           .setCustomId('giveaway_huge_subcategory_select')
@@ -2631,7 +2318,10 @@ client.on('interactionCreate', async (interaction) => {
 
       const row = new ActionRowBuilder().addComponents(continueSelect);
       
-      const itemsList = formatItemsList(interaction.user.tradeItems);
+      let itemsList = '';
+      interaction.user.tradeItems.forEach(item => {
+        itemsList += `${item.name} x${item.quantity}\n`;
+      });
 
       await interaction.reply({ 
         content: `**Selected Items:**\n${itemsList}\n\nWhat would you like to do?`,
@@ -2663,9 +2353,14 @@ client.on('interactionCreate', async (interaction) => {
 
       const row = new ActionRowBuilder().addComponents(continueSelect);
       
-      const itemsList = interaction.user.tradeItems && interaction.user.tradeItems.length > 0 
-        ? formatItemsList(interaction.user.tradeItems)
-        : 'No items selected';
+      let itemsList = '';
+      if (interaction.user.tradeItems && interaction.user.tradeItems.length > 0) {
+        interaction.user.tradeItems.forEach(item => {
+          itemsList += `${item.name} x${item.quantity}\n`;
+        });
+      } else {
+        itemsList = 'No items selected';
+      }
 
       await interaction.reply({ 
         content: `**Selected Items:**\n${itemsList}\n\nWhat would you like to do?`,
@@ -2698,7 +2393,10 @@ client.on('interactionCreate', async (interaction) => {
 
       const row = new ActionRowBuilder().addComponents(continueSelect);
       
-      const itemsList = formatItemsList(interaction.user.offerTradeItems);
+      let itemsList = '';
+      interaction.user.offerTradeItems.forEach(item => {
+        itemsList += `${item.name} x${item.quantity}\n`;
+      });
 
       await interaction.reply({ 
         content: `**Selected Items:**\n${itemsList}\n\nWhat would you like to do?`,
@@ -2731,7 +2429,10 @@ client.on('interactionCreate', async (interaction) => {
 
       const row = new ActionRowBuilder().addComponents(continueSelect);
       
-      const itemsList = formatItemsList(interaction.user.inventoryItems);
+      let itemsList = '';
+      interaction.user.inventoryItems.forEach(item => {
+        itemsList += `${item.name} x${item.quantity}\n`;
+      });
 
       await interaction.reply({ 
         content: `**Selected Items:**\n${itemsList}\n\nWhat would you like to do?`,
@@ -2772,7 +2473,10 @@ client.on('interactionCreate', async (interaction) => {
 
       const row = new ActionRowBuilder().addComponents(continueSelect);
       
-      const itemsList = formatItemsList(interaction.user.tradeItems);
+      let itemsList = '';
+      interaction.user.tradeItems.forEach(item => {
+        itemsList += `${item.name} x${item.quantity}\n`;
+      });
 
       await interaction.reply({ 
         content: `**Selected Items:**\n${itemsList}\n\nWhat would you like to do?`,
@@ -2814,7 +2518,10 @@ client.on('interactionCreate', async (interaction) => {
 
       const row = new ActionRowBuilder().addComponents(continueSelect);
       
-      const itemsList = formatItemsList(interaction.user.offerTradeItems);
+      let itemsList = '';
+      interaction.user.offerTradeItems.forEach(item => {
+        itemsList += `${item.name} x${item.quantity}\n`;
+      });
 
       await interaction.reply({ 
         content: `**Selected Items:**\n${itemsList}\n\nWhat would you like to do?`,
@@ -2854,7 +2561,10 @@ client.on('interactionCreate', async (interaction) => {
 
       const row = new ActionRowBuilder().addComponents(continueSelect);
       
-      const itemsList = formatItemsList(interaction.user.inventoryItems);
+      let itemsList = '';
+      interaction.user.inventoryItems.forEach(item => {
+        itemsList += `${item.name} x${item.quantity}\n`;
+      });
 
       await interaction.reply({ 
         content: `**Selected Items:**\n${itemsList}\n\nWhat would you like to do?`,
@@ -2892,7 +2602,10 @@ client.on('interactionCreate', async (interaction) => {
 
       const row = new ActionRowBuilder().addComponents(continueSelect);
       
-      const itemsList = formatItemsList(interaction.user.giveawayItems);
+      let itemsList = '';
+      interaction.user.giveawayItems.forEach(item => {
+        itemsList += `${item.name} x${item.quantity}\n`;
+      });
 
       await interaction.reply({ 
         content: `**Selected Items:**\n${itemsList}\n\nWhat would you like to do?`,
@@ -3000,12 +2713,10 @@ client.on('interactionCreate', async (interaction) => {
       const durationStr = interaction.fields.getTextInputValue('gwa_duration');
       
       // Validate duration
-      let duration = parseDuration(durationStr);
-      const MAX_DURATION_MINUTES = 1440; // 24 hours = 1440 minutes = 86400 seconds
-      
-      if (isNaN(duration) || duration < 1 || duration > MAX_DURATION_MINUTES) {
+      let duration = parseInt(durationStr);
+      if (isNaN(duration) || duration < 1 || duration > 1440) {
         return interaction.reply({ 
-          content: `Invalid duration. Please enter a time between 1 second and 24 hours (1440 minutes or 86400 seconds). Examples: 60s, 30m, 1h, 1440, etc.`, 
+          content: 'Invalid duration. Please enter a number between 1 and 1440 minutes (24 hours).', 
           ephemeral: true 
         });
       }
@@ -3039,42 +2750,32 @@ client.on('interactionCreate', async (interaction) => {
       });
 
       // Add duration field
-      embed.addFields({
-        name: 'Time Remaining',
-        value: 'Calculating...',
-        inline: false
-      });
-
-      // Calculate duration text for the reply message
       const durationHours = Math.floor(duration / 60);
       const durationMins = duration % 60;
       let durationText = '';
       if (durationHours > 0) durationText += `${durationHours}h `;
       if (durationMins > 0) durationText += `${durationMins}m`;
       if (!durationText) durationText = duration + 'm';
-
-      // Store durationText in user object temporarily for use after setInterval
-      const replyMessage = `Giveaway created! Posted to the channel with role mention! Duration: ${durationText}`;
+      
+      embed.addFields({
+        name: 'Duration',
+        value: durationText,
+        inline: false
+      });
 
       const enterButton = new ButtonBuilder()
         .setCustomId(`giveaway_enter_${Date.now()}`)
         .setLabel('Enter Giveaway')
         .setStyle(ButtonStyle.Success);
 
-      const entriesButton = new ButtonBuilder()
-        .setCustomId(`giveaway_entries_${Date.now()}`)
-        .setLabel('0 Entries')
-        .setStyle(ButtonStyle.Secondary)
-        .setDisabled(false);
-
       const endButton = new ButtonBuilder()
         .setCustomId(`giveaway_end_${Date.now()}`)
         .setLabel('End Giveaway')
         .setStyle(ButtonStyle.Danger);
 
-      const row = new ActionRowBuilder().addComponents(enterButton, entriesButton, endButton);
+      const row = new ActionRowBuilder().addComponents(enterButton, endButton);
 
-      const targetChannel = redirectGiveawayChannelId ? interaction.guild.channels.cache.get(redirectGiveawayChannelId) : interaction.channel;
+      const targetChannel = redirectTradeChannelId ? interaction.guild.channels.cache.get(redirectTradeChannelId) : interaction.channel;
       
       // Send ping message with role mention
       await targetChannel.send(`<@&${config.giveawayRoleId}> **New Giveaway Started!**`);
@@ -3089,9 +2790,12 @@ client.on('interactionCreate', async (interaction) => {
         messageId: message.id,
         entries: [],
         duration: duration,
-        expiresAt: expiresAt,
-        updateInterval: null
+        expiresAt: expiresAt
       };
+
+      // Add timer and updateInterval to giveawayData
+      giveawayData.timer = null;
+      giveawayData.updateInterval = null;
 
       giveaways.set(message.id, giveawayData);
       
@@ -3099,135 +2803,132 @@ client.on('interactionCreate', async (interaction) => {
       const userId = interaction.user.id;
       userGiveawayCount.set(userId, (userGiveawayCount.get(userId) || 0) + 1);
       
-      // Function to format remaining time
-      const formatTimeRemaining = (expiresAt) => {
-        const remaining = Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000));
-        if (remaining <= 0) return 'Ending...';
-        
-        const hours = Math.floor(remaining / 3600);
-        const minutes = Math.floor((remaining % 3600) / 60);
-        const seconds = remaining % 60;
-        
-        let timeStr = '';
-        if (hours > 0) timeStr += `${hours}h `;
-        if (minutes > 0) timeStr += `${minutes}m `;
-        timeStr += `${seconds}s`;
-        return timeStr;
-      };
-      
-      // Update embed every second
-      const updateInterval = setInterval(async () => {
+      // Function to end giveaway
+      const endGiveaway = async () => {
+        const giveaway = giveaways.get(message.id);
+        if (!giveaway) return;
+
+        // Clear intervals
+        if (giveaway.updateInterval) clearInterval(giveaway.updateInterval);
+        if (giveaway.timer) clearTimeout(giveaway.timer);
+
+        const channel = interaction.guild.channels.cache.get(giveaway.channelId);
+        if (!channel) {
+          giveaways.delete(message.id);
+          userGiveawayCount.set(userId, Math.max(0, (userGiveawayCount.get(userId) || 1) - 1));
+          return;
+        }
+
+        // Delete the giveaway message
         try {
-          const currentGiveaway = giveaways.get(message.id);
-          if (!currentGiveaway) {
-            clearInterval(updateInterval);
-            return;
-          }
-          
-          const remaining = Math.max(0, Math.ceil((currentGiveaway.expiresAt - Date.now()) / 1000));
-          
-          // Check if giveaway should end
-          if (remaining <= 0) {
-            clearInterval(updateInterval);
-            giveaways.delete(message.id);
-            userGiveawayCount.set(userId, Math.max(0, (userGiveawayCount.get(userId) || 1) - 1));
-            
-            // Auto-end the giveaway
-            if (currentGiveaway.entries.length > 0) {
-              const randomIndex = Math.floor(Math.random() * currentGiveaway.entries.length);
-              const winner = currentGiveaway.entries[randomIndex];
-              
-              const endEmbed = new EmbedBuilder()
-                .setTitle('🎁 Giveaway Ended!')
-                .setColor(0xFF1493)
-                .setDescription(`**Winner:** ${winner.user}`)
-                .setFooter({ text: 'Version 1.0.9 | Made By Atlas' });
-              
-              let itemsText = 'None';
-              if (currentGiveaway.items.length > 0) {
-                itemsText = currentGiveaway.items.map(item => 
-                  typeof item === 'object' ? `${item.name} x${item.quantity}` : item
-                ).join('\n');
-              }
-              
-              endEmbed.addFields({
-                name: 'Giveaway Items',
-                value: itemsText,
-                inline: false
-              });
-              
-              endEmbed.addFields({
-                name: 'Total Entries',
-                value: currentGiveaway.entries.length.toString(),
-                inline: true
-              });
-              
-              const channel = interaction.guild.channels.cache.get(currentGiveaway.channelId);
-              if (channel) {
-                await channel.send({ embeds: [endEmbed] });
-                await channel.send(`🎉 Congratulations ${winner.user}! You won the giveaway!`);
-              }
-            }
-            return;
-          }
-          
-          // Update the embed with new time remaining
-          const updatedEmbed = new EmbedBuilder()
-            .setTitle('🎁 Giveaway')
-            .setDescription(currentGiveaway.description ? `**${currentGiveaway.description}**\n\n**Click the button below to enter the giveaway!**` : '**Click the button below to enter the giveaway!**')
+          const msg = await channel.messages.fetch(message.id);
+          await msg.delete();
+        } catch (e) {
+          // Message might have been deleted already
+        }
+
+        if (giveaway.entries.length === 0) {
+          await channel.send('Giveaway ended with no entries.');
+        } else {
+          // Select random winner
+          const randomIndex = Math.floor(Math.random() * giveaway.entries.length);
+          const winner = giveaway.entries[randomIndex];
+
+          // Create winner embed
+          const winnerEmbed = new EmbedBuilder()
+            .setTitle('🎁 Giveaway Ended!')
             .setColor(0xFF1493)
-            .setFooter({ text: 'Version 1.0.9 | Made By Atlas' })
-            .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
-          
-          const giveawayItemsText = formatItemsText(currentGiveaway.items);
-          
-          updatedEmbed.addFields({
+            .setDescription(`**Winner:** ${winner.user}`)
+            .setFooter({ text: 'Version 1.0.9 | Made By Atlas' });
+
+          // List items
+          let itemsText = 'None';
+          if (giveaway.items.length > 0) {
+            itemsText = giveaway.items.map(item => 
+              typeof item === 'object' ? `${item.name} x${item.quantity}` : item
+            ).join('\n');
+          }
+
+          winnerEmbed.addFields({
             name: 'Giveaway Items',
-            value: giveawayItemsText,
+            value: itemsText,
             inline: false
           });
-          
-          updatedEmbed.addFields({
-            name: 'Hosted by',
-            value: currentGiveaway.host.toString(),
-            inline: false
+
+          winnerEmbed.addFields({
+            name: 'Total Entries',
+            value: giveaway.entries.length.toString(),
+            inline: true
           });
+
+          await channel.send({ embeds: [winnerEmbed] });
+          await channel.send(`🎉 Congratulations ${winner.user}! You won the giveaway!`);
+        }
+
+        giveaways.delete(message.id);
+        userGiveawayCount.set(userId, Math.max(0, (userGiveawayCount.get(userId) || 1) - 1));
+      };
+
+      // Update timer every second
+      giveawayData.updateInterval = setInterval(async () => {
+        const giveaway = giveaways.get(message.id);
+        if (!giveaway) return;
+
+        const timeRemaining = giveaway.expiresAt - Date.now();
+        
+        if (timeRemaining <= 0) {
+          clearInterval(giveawayData.updateInterval);
+          await endGiveaway();
+          return;
+        }
+
+        // Update embed with timer
+        try {
+          const msg = await targetChannel.messages.fetch(message.id);
+          const currentEmbed = msg.embeds[0];
           
-          updatedEmbed.addFields({
-            name: 'Time Remaining',
-            value: formatTimeRemaining(currentGiveaway.expiresAt),
-            inline: false
-          });
-          
-          // Update components with new entries count
-          const entriesCount = currentGiveaway.entries.length;
-          const enterBtn = new ButtonBuilder()
-            .setCustomId(`giveaway_enter_${currentGiveaway.messageId}`)
-            .setLabel('Enter Giveaway')
-            .setStyle(ButtonStyle.Success);
-          
-          const entriesBtn = new ButtonBuilder()
-            .setCustomId(`giveaway_entries_${currentGiveaway.messageId}`)
-            .setLabel(`${entriesCount} ${entriesCount === 1 ? 'Entry' : 'Entries'}`)
-            .setStyle(ButtonStyle.Secondary);
-          
-          const endBtn = new ButtonBuilder()
-            .setCustomId(`giveaway_end_${currentGiveaway.messageId}`)
-            .setLabel('End Giveaway')
-            .setStyle(ButtonStyle.Danger);
-          
-          const row = new ActionRowBuilder().addComponents(enterBtn, entriesBtn, endBtn);
-          
-          await message.edit({ embeds: [updatedEmbed], components: [row] });
-        } catch (error) {
-          clearInterval(updateInterval);
-          console.error('Error updating giveaway embed:', error);
+          if (currentEmbed) {
+            const newEmbed = EmbedBuilder.from(currentEmbed);
+            
+            // Remove old duration/timer field
+            const fields = newEmbed.data.fields || [];
+            newEmbed.data.fields = fields.filter(f => f.name !== 'Timer');
+            
+            // Add updated timer field
+            const timeInSeconds = Math.max(0, Math.floor(timeRemaining / 1000));
+            const minutes = Math.floor(timeInSeconds / 60);
+            const seconds = timeInSeconds % 60;
+            const timerText = `${minutes}m ${seconds}s`;
+
+            newEmbed.addFields({
+              name: 'Timer',
+              value: timerText,
+              inline: false
+            });
+
+            // Update entries count in description
+            const entriesCount = giveaway.entries.length;
+            newEmbed.addFields({
+              name: 'Current Entries',
+              value: entriesCount.toString(),
+              inline: true
+            });
+
+            await msg.edit({ embeds: [newEmbed] });
+          }
+        } catch (e) {
+          clearInterval(giveawayData.updateInterval);
+          // Message was deleted
         }
       }, 1000);
-      
-      giveawayData.updateInterval = updateInterval;
 
-      await interaction.reply({ content: replyMessage, flags: 64 });
+      // Set timeout to end giveaway when time expires
+      giveawayData.timer = setTimeout(async () => {
+        clearInterval(giveawayData.updateInterval);
+        await endGiveaway();
+      }, duration * 60 * 1000);
+
+      await interaction.reply({ content: `Giveaway created! Posted to <#${targetChannel.id}> with role mention! Duration: ${durationText}`, flags: 64 });
       return;
     }
 
@@ -3316,11 +3017,6 @@ client.on('interactionCreate', async (interaction) => {
       const trade = trades.get(messageId);
       if (!trade) return interaction.reply({ content: 'Trade not found.', flags: 64 });
 
-      // Check if user is the trade host
-      if (trade.host.id === interaction.user.id) {
-        return interaction.reply({ content: '❌ Você não pode fazer uma oferta em seu próprio trade!', flags: 64 });
-      }
-
       // Add offer to trade
       trade.offers.push({
         user: interaction.user,
@@ -3345,11 +3041,6 @@ client.on('interactionCreate', async (interaction) => {
     if (interaction.customId === 'bid_modal') {
       const auction = Array.from(auctions.values()).find(a => a.channelId === interaction.channel.id);
       if (!auction) return interaction.reply({ content: 'No auction running.', ephemeral: true });
-
-      // Check if user is the auction host
-      if (auction.host.id === interaction.user.id) {
-        return interaction.reply({ content: '❌ Você não pode fazer um bid em seu próprio leilão!', ephemeral: true });
-      }
 
       const diamondsStr = interaction.fields.getTextInputValue('diamonds');
       const items = interaction.fields.getTextInputValue('items') || '';
@@ -3500,65 +3191,10 @@ client.on('interactionCreate', async (interaction) => {
 
       // Store waiting state
       interaction.user.waitingForProof = {
-        auctionProofMessageId: interaction.message?.id || null,
+        tradeMessageId: null,
         description: description,
         type: 'auction'
       };
-    }
-
-    if (interaction.customId === 'proof_image_modal_giveaway') {
-      const description = interaction.fields.getTextInputValue('proof_description') || '';
-
-      // Show instruction
-      await interaction.reply({
-        content: '📸 Please attach the proof image to your next message in this channel.\n\nAfter you send the image, the proof will be automatically forwarded to the records channel.',
-        ephemeral: false
-      });
-
-      // Store waiting state
-      interaction.user.waitingForProof = {
-        giveawayProofMessageId: interaction.message?.id || null,
-        description: description,
-        type: 'giveaway'
-      };
-    }
-
-    if (interaction.customId === 'giveaway_diamonds_modal') {
-      const diamondsStr = interaction.fields.getTextInputValue('giveaway_diamonds_amount');
-      const diamonds = parseBid(diamondsStr);
-
-      if (diamonds <= 0) {
-        return interaction.reply({ content: 'Please enter a valid amount of diamonds.', ephemeral: true });
-      }
-
-      // Store diamonds as item
-      if (!interaction.user.giveawayItems) {
-        interaction.user.giveawayItems = [];
-      }
-      
-      interaction.user.giveawayItems.push({ name: '💎 Diamonds', quantity: diamonds });
-
-      // Show continue select
-      const { StringSelectMenuBuilder } = require('discord.js');
-      
-      const continueSelect = new StringSelectMenuBuilder()
-        .setCustomId('giveaway_continue_select')
-        .setPlaceholder('What would you like to do?')
-        .addOptions([
-          { label: '✅ Create Giveaway', value: 'create_giveaway' },
-          { label: '➕ Add Another Category', value: 'add_category' },
-          { label: '❌ Remove Items', value: 'remove_items' }
-        ]);
-
-      const row = new ActionRowBuilder().addComponents(continueSelect);
-      
-      const itemsList = formatItemsList(interaction.user.giveawayItems);
-
-      await interaction.reply({ 
-        content: `**Selected Items:**\n${itemsList}\n\nWhat would you like to do?`,
-        components: [row], 
-        flags: 64 
-      });
     }
   }
 });
@@ -3690,24 +3326,13 @@ async function endAuction(channel) {
 
   // Add Upload Proof Image button
   const proofButton = new ButtonBuilder()
-    .setCustomId(`upload_proof_auction_${channel.id}`)
+    .setCustomId(`upload_proof_auction_${Date.now()}`)
     .setLabel('Upload Proof Image')
     .setStyle(ButtonStyle.Primary);
 
   const row = new ActionRowBuilder().addComponents(proofButton);
 
-  const proofMessage = await channel.send({ embeds: [embed], components: [row] });
-
-  // Store finished auction data for proof handler
-  finishedAuctions.set(proofMessage.id, {
-    host: auction.host,
-    title: auction.title,
-    winner: winner.user,
-    diamonds: winner.diamonds,
-    items: winner.items,
-    channelId: channel.id,
-    auctionChannelId: '1461849894615646309'
-  });
+  await channel.send({ embeds: [embed], components: [row] });
 }
 
 client.login(process.env.TOKEN || config.token);
