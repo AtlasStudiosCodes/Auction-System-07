@@ -10,6 +10,7 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBit
 let redirectChannelId = config.defaultAuctionChannelId || null;
 let redirectTradeChannelId = config.defaultTradeChannelId || null;
 let redirectInventoryChannelId = null;
+let redirectGiveawayChannelId = '1462190801198252226';
 
 const auctions = new Map(); // channelId -> { host, title, description, model, time, startingPrice, bids: [{user, diamonds, items}], timer, started, channelId, messageId, updateInterval }
 const finishedAuctions = new Map(); // messageId -> { host, title, winner, diamonds, items, channelId, auctionMessageId }
@@ -159,6 +160,7 @@ function saveData() {
     redirectChannelId,
     redirectTradeChannelId,
     redirectInventoryChannelId,
+    redirectGiveawayChannelId,
     inventories: Array.from(inventories.entries())
   };
   
@@ -173,6 +175,7 @@ function loadData() {
       if (data.redirectChannelId) redirectChannelId = data.redirectChannelId;
       if (data.redirectTradeChannelId) redirectTradeChannelId = data.redirectTradeChannelId;
       if (data.redirectInventoryChannelId) redirectInventoryChannelId = data.redirectInventoryChannelId;
+      if (data.redirectGiveawayChannelId) redirectGiveawayChannelId = data.redirectGiveawayChannelId;
       
       if (data.inventories) {
         data.inventories.forEach(([key, value]) => {
@@ -2819,7 +2822,7 @@ client.on('interactionCreate', async (interaction) => {
 
       const row = new ActionRowBuilder().addComponents(enterButton, endButton);
 
-      const targetChannel = redirectTradeChannelId ? interaction.guild.channels.cache.get(redirectTradeChannelId) : interaction.channel;
+      const targetChannel = redirectGiveawayChannelId ? interaction.guild.channels.cache.get(redirectGiveawayChannelId) : interaction.channel;
       
       // Send ping message with role mention
       await targetChannel.send(`<@&${config.giveawayRoleId}> **New Giveaway Started!**`);
