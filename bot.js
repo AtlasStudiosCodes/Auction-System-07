@@ -1277,6 +1277,65 @@ client.on('interactionCreate', async (interaction) => {
         clearInterval(giveaway.updateInterval);
       }
 
+      // Update the original giveaway embed to show "Ended by host"
+      try {
+        const channel = interaction.guild.channels.cache.get(giveaway.channelId);
+        if (channel) {
+          const message = await channel.messages.fetch(messageId);
+          if (message) {
+            const endedEmbed = new EmbedBuilder()
+              .setTitle('🎁 Giveaway')
+              .setDescription(giveaway.description ? `**${giveaway.description}**\n\n**Ended by host**` : '**Ended by host**')
+              .setColor(0xFF0000) // Red color
+              .setFooter({ text: 'Version 1.0.9 | Made By Atlas' })
+              .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
+
+            const giveawayItemsText = formatItemsText(giveaway.items);
+
+            endedEmbed.addFields({
+              name: 'Giveaway Items',
+              value: giveawayItemsText,
+              inline: false
+            });
+
+            endedEmbed.addFields({
+              name: 'Hosted by',
+              value: giveaway.host.toString(),
+              inline: false
+            });
+
+            endedEmbed.addFields({
+              name: 'Status',
+              value: 'Ended by host',
+              inline: false
+            });
+
+            // Disable all buttons
+            const disabledRow = new ActionRowBuilder().addComponents(
+              new ButtonBuilder()
+                .setCustomId('disabled_enter')
+                .setLabel('Enter Giveaway')
+                .setStyle(ButtonStyle.Success)
+                .setDisabled(true),
+              new ButtonBuilder()
+                .setCustomId('disabled_entries')
+                .setLabel(`${giveaway.entries.length} ${giveaway.entries.length === 1 ? 'Entry' : 'Entries'}`)
+                .setStyle(ButtonStyle.Secondary)
+                .setDisabled(true),
+              new ButtonBuilder()
+                .setCustomId('disabled_end')
+                .setLabel('End Giveaway')
+                .setStyle(ButtonStyle.Danger)
+                .setDisabled(true)
+            );
+
+            await message.edit({ embeds: [endedEmbed], components: [disabledRow] });
+          }
+        }
+      } catch (error) {
+        console.error('Error updating giveaway embed:', error);
+      }
+
       if (giveaway.entries.length === 0) {
         giveaways.delete(messageId);
         // Decrement giveaway count for host
