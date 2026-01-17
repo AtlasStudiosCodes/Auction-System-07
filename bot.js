@@ -148,6 +148,13 @@ function formatItemsText(items) {
     if (typeof item === 'object') {
       const emoji = getItemEmoji(item.name);
       const formattedName = formatItemName(item.name);
+      
+      // Special handling for Diamonds - use formatBid for abbreviations
+      if (item.name === '💎 Diamonds') {
+        const abbreviatedValue = formatBid(item.quantity);
+        return `${emoji} **${formattedName}** (**${abbreviatedValue} 💎**)`;
+      }
+      
       return `${emoji} **${formattedName}** (**x${item.quantity}**)`;
     } else {
       const emoji = getItemEmoji(item);
