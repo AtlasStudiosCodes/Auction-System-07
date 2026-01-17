@@ -3006,6 +3006,9 @@ client.on('interactionCreate', async (interaction) => {
       if (durationMins > 0) durationText += `${durationMins}m`;
       if (!durationText) durationText = duration + 'm';
 
+      // Store durationText in user object temporarily for use after setInterval
+      const replyMessage = `Giveaway created! Posted to the channel with role mention! Duration: ${durationText}`;
+
       const enterButton = new ButtonBuilder()
         .setCustomId(`giveaway_enter_${Date.now()}`)
         .setLabel('Enter Giveaway')
@@ -3177,7 +3180,7 @@ client.on('interactionCreate', async (interaction) => {
       
       giveawayData.updateInterval = updateInterval;
 
-      await interaction.reply({ content: `Giveaway created! Posted to the channel with role mention! Duration: ${durationText}`, flags: 64 });
+      await interaction.reply({ content: replyMessage, flags: 64 });
       return;
     }
 
