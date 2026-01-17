@@ -42,7 +42,7 @@ const itemCategories = {
 
 // Image URLs for Huge pets
 const hugeImages = {
-  'HugeBlackHoleAngelus': '<:HugeBlackHoleAngelus:1461868926412656863>',
+  'HugeBlackHoleAngelus': '<:HugeBlackHoleAngelus:1461868865758695646>',
   //'HugeIceCubeGingerbreadCorgi': ':HugeIceCubeGingerbreadCorgi:',
   //'HugePartyDragon': ':HugePartyDragon:',
   //'HugeGoldenPartyDragon': ':HugeGoldenPartyDragon:',
