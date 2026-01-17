@@ -451,6 +451,31 @@ function formatBid(num) {
   return num.toString();
 }
 
+function parseDuration(str) {
+  str = str.toString().trim().toLowerCase();
+  
+  // Check for time units
+  const secondsMatch = str.match(/^(\d+(?:\.\d+)?)\s*s$/);
+  const minutesMatch = str.match(/^(\d+(?:\.\d+)?)\s*m$/);
+  const hoursMatch = str.match(/^(\d+(?:\.\d+)?)\s*h$/);
+  
+  let minutes = 0;
+  
+  if (secondsMatch) {
+    const seconds = parseFloat(secondsMatch[1]);
+    minutes = Math.ceil(seconds / 60);
+  } else if (minutesMatch) {
+    minutes = Math.ceil(parseFloat(minutesMatch[1]));
+  } else if (hoursMatch) {
+    minutes = Math.ceil(parseFloat(hoursMatch[1]) * 60);
+  } else {
+    // If no unit, assume it's minutes
+    minutes = parseInt(str);
+  }
+  
+  return minutes;
+}
+
 client.on('interactionCreate', async (interaction) => {
   if (interaction.isCommand()) {
     const { commandName } = interaction;
@@ -2074,9 +2099,9 @@ client.on('interactionCreate', async (interaction) => {
 
         const durationInput = new TextInputBuilder()
           .setCustomId('gwa_duration')
-          .setLabel('Duration (in minutes, max 1440 = 24 hours)')
+          .setLabel('Duration (max 24 hours / 86400 seconds)')
           .setStyle(TextInputStyle.Short)
-          .setPlaceholder('e.g., 60 for 1 hour, 1440 for 24 hours')
+          .setPlaceholder('e.g., 60m, 1h, 3600s, or 1440')
           .setMinLength(1)
           .setMaxLength(4)
           .setRequired(true);
@@ -2783,10 +2808,12 @@ client.on('interactionCreate', async (interaction) => {
       const durationStr = interaction.fields.getTextInputValue('gwa_duration');
       
       // Validate duration
-      let duration = parseInt(durationStr);
-      if (isNaN(duration) || duration < 1 || duration > 1440) {
+      let duration = parseDuration(durationStr);
+      const MAX_DURATION_MINUTES = 1440; // 24 hours = 1440 minutes = 86400 seconds
+      
+      if (isNaN(duration) || duration < 1 || duration > MAX_DURATION_MINUTES) {
         return interaction.reply({ 
-          content: 'Invalid duration. Please enter a number between 1 and 1440 minutes (24 hours).', 
+          content: `Invalid duration. Please enter a time between 1 second and 24 hours (1440 minutes or 86400 seconds). Examples: 60s, 30m, 1h, 1440, etc.`, 
           ephemeral: true 
         });
       }
