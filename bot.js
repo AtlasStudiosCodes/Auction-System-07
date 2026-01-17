@@ -1169,8 +1169,28 @@ client.on('interactionCreate', async (interaction) => {
       await interaction.reply({ content: `✅ You have entered the giveaway! Total entries: ${giveaway.entries.length}`, ephemeral: true });
     }
 
+    if (interaction.customId.startsWith('giveaway_entries_')) {
+      const messageId = interaction.customId.replace('giveaway_entries_', '');
+      const giveaway = giveaways.get(messageId);
+      if (!giveaway) return interaction.reply({ content: 'Giveaway not found.', ephemeral: true });
+
+      // Create entries list
+      let entriesList = 'No entries yet.';
+      if (giveaway.entries.length > 0) {
+        entriesList = giveaway.entries.map((entry, idx) => `${idx + 1}. ${entry.user.displayName || entry.user.username}`).join('\n');
+      }
+
+      const entriesEmbed = new EmbedBuilder()
+        .setTitle('🎁 Giveaway Entries')
+        .setDescription(entriesList)
+        .setColor(0xFF1493)
+        .setFooter({ text: `Total: ${giveaway.entries.length} ${giveaway.entries.length === 1 ? 'entry' : 'entries'}` });
+
+      await interaction.reply({ embeds: [entriesEmbed], ephemeral: true });
+    }
+
     if (interaction.customId.startsWith('giveaway_end_')) {
-      const messageId = interaction.message.id;
+      const messageId = interaction.customId.replace('giveaway_end_', '');
       const giveaway = giveaways.get(messageId);
       if (!giveaway) return interaction.reply({ content: 'Giveaway not found.', ephemeral: true });
 
@@ -1178,6 +1198,11 @@ client.on('interactionCreate', async (interaction) => {
         const adminRoles = ['1461505505401896972', '1461481291118678087', '1461484563183435817'];
         const hasAdminRole = interaction.member.roles.cache.some(role => adminRoles.includes(role.id));
         if (!hasAdminRole) return interaction.reply({ content: 'Only the host or admin can end the giveaway.', ephemeral: true });
+      }
+
+      // Clear update interval
+      if (giveaway.updateInterval) {
+        clearInterval(giveaway.updateInterval);
       }
 
       if (giveaway.entries.length === 0) {
@@ -1228,9 +1253,11 @@ client.on('interactionCreate', async (interaction) => {
       // Decrement giveaway count for host
       const hostId = giveaway.host.id;
       userGiveawayCount.set(hostId, Math.max(0, (userGiveawayCount.get(hostId) || 1) - 1));
-
+      
+      // Delete giveaway
       giveaways.delete(messageId);
-      await interaction.reply({ content: 'Giveaway ended! Winner selected.', ephemeral: true });
+      
+      await interaction.reply({ content: 'Giveaway ended!', ephemeral: true });
     }
 
     if (interaction.customId === 'create_auction') {
@@ -2847,16 +2874,9 @@ client.on('interactionCreate', async (interaction) => {
       });
 
       // Add duration field
-      const durationHours = Math.floor(duration / 60);
-      const durationMins = duration % 60;
-      let durationText = '';
-      if (durationHours > 0) durationText += `${durationHours}h `;
-      if (durationMins > 0) durationText += `${durationMins}m`;
-      if (!durationText) durationText = duration + 'm';
-      
       embed.addFields({
-        name: 'Duration',
-        value: durationText,
+        name: 'Time Remaining',
+        value: 'Calculating...',
         inline: false
       });
 
@@ -2865,12 +2885,18 @@ client.on('interactionCreate', async (interaction) => {
         .setLabel('Enter Giveaway')
         .setStyle(ButtonStyle.Success);
 
+      const entriesButton = new ButtonBuilder()
+        .setCustomId(`giveaway_entries_${Date.now()}`)
+        .setLabel('0 Entries')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(false);
+
       const endButton = new ButtonBuilder()
         .setCustomId(`giveaway_end_${Date.now()}`)
         .setLabel('End Giveaway')
         .setStyle(ButtonStyle.Danger);
 
-      const row = new ActionRowBuilder().addComponents(enterButton, endButton);
+      const row = new ActionRowBuilder().addComponents(enterButton, entriesButton, endButton);
 
       const targetChannel = redirectGiveawayChannelId ? interaction.guild.channels.cache.get(redirectGiveawayChannelId) : interaction.channel;
       
@@ -2887,7 +2913,8 @@ client.on('interactionCreate', async (interaction) => {
         messageId: message.id,
         entries: [],
         duration: duration,
-        expiresAt: expiresAt
+        expiresAt: expiresAt,
+        updateInterval: null
       };
 
       giveaways.set(message.id, giveawayData);
@@ -2896,11 +2923,133 @@ client.on('interactionCreate', async (interaction) => {
       const userId = interaction.user.id;
       userGiveawayCount.set(userId, (userGiveawayCount.get(userId) || 0) + 1);
       
-      // Set timeout to end giveaway and decrement counter
-      setTimeout(() => {
-        giveaways.delete(message.id);
-        userGiveawayCount.set(userId, Math.max(0, (userGiveawayCount.get(userId) || 1) - 1));
-      }, duration * 60 * 1000);
+      // Function to format remaining time
+      const formatTimeRemaining = (expiresAt) => {
+        const remaining = Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000));
+        if (remaining <= 0) return 'Ending...';
+        
+        const hours = Math.floor(remaining / 3600);
+        const minutes = Math.floor((remaining % 3600) / 60);
+        const seconds = remaining % 60;
+        
+        let timeStr = '';
+        if (hours > 0) timeStr += `${hours}h `;
+        if (minutes > 0) timeStr += `${minutes}m `;
+        timeStr += `${seconds}s`;
+        return timeStr;
+      };
+      
+      // Update embed every second
+      const updateInterval = setInterval(async () => {
+        try {
+          const currentGiveaway = giveaways.get(message.id);
+          if (!currentGiveaway) {
+            clearInterval(updateInterval);
+            return;
+          }
+          
+          const remaining = Math.max(0, Math.ceil((currentGiveaway.expiresAt - Date.now()) / 1000));
+          
+          // Check if giveaway should end
+          if (remaining <= 0) {
+            clearInterval(updateInterval);
+            giveaways.delete(message.id);
+            userGiveawayCount.set(userId, Math.max(0, (userGiveawayCount.get(userId) || 1) - 1));
+            
+            // Auto-end the giveaway
+            if (currentGiveaway.entries.length > 0) {
+              const randomIndex = Math.floor(Math.random() * currentGiveaway.entries.length);
+              const winner = currentGiveaway.entries[randomIndex];
+              
+              const endEmbed = new EmbedBuilder()
+                .setTitle('🎁 Giveaway Ended!')
+                .setColor(0xFF1493)
+                .setDescription(`**Winner:** ${winner.user}`)
+                .setFooter({ text: 'Version 1.0.9 | Made By Atlas' });
+              
+              let itemsText = 'None';
+              if (currentGiveaway.items.length > 0) {
+                itemsText = currentGiveaway.items.map(item => 
+                  typeof item === 'object' ? `${item.name} x${item.quantity}` : item
+                ).join('\n');
+              }
+              
+              endEmbed.addFields({
+                name: 'Giveaway Items',
+                value: itemsText,
+                inline: false
+              });
+              
+              endEmbed.addFields({
+                name: 'Total Entries',
+                value: currentGiveaway.entries.length.toString(),
+                inline: true
+              });
+              
+              const channel = interaction.guild.channels.cache.get(currentGiveaway.channelId);
+              if (channel) {
+                await channel.send({ embeds: [endEmbed] });
+                await channel.send(`🎉 Congratulations ${winner.user}! You won the giveaway!`);
+              }
+            }
+            return;
+          }
+          
+          // Update the embed with new time remaining
+          const updatedEmbed = new EmbedBuilder()
+            .setTitle('🎁 Giveaway')
+            .setDescription(currentGiveaway.description ? `**${currentGiveaway.description}**\n\n**Click the button below to enter the giveaway!**` : '**Click the button below to enter the giveaway!**')
+            .setColor(0xFF1493)
+            .setFooter({ text: 'Version 1.0.9 | Made By Atlas' })
+            .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
+          
+          const giveawayItemsText = formatItemsText(currentGiveaway.items);
+          
+          updatedEmbed.addFields({
+            name: 'Giveaway Items',
+            value: giveawayItemsText,
+            inline: false
+          });
+          
+          updatedEmbed.addFields({
+            name: 'Hosted by',
+            value: currentGiveaway.host.toString(),
+            inline: false
+          });
+          
+          updatedEmbed.addFields({
+            name: 'Time Remaining',
+            value: formatTimeRemaining(currentGiveaway.expiresAt),
+            inline: false
+          });
+          
+          // Update components with new entries count
+          const entriesCount = currentGiveaway.entries.length;
+          const enterBtn = new ButtonBuilder()
+            .setCustomId(`giveaway_enter_${currentGiveaway.messageId}`)
+            .setLabel('Enter Giveaway')
+            .setStyle(ButtonStyle.Success);
+          
+          const entriesBtn = new ButtonBuilder()
+            .setCustomId(`giveaway_entries_${currentGiveaway.messageId}`)
+            .setLabel(`${entriesCount} ${entriesCount === 1 ? 'Entry' : 'Entries'}`)
+            .setStyle(ButtonStyle.Secondary);
+          
+          const endBtn = new ButtonBuilder()
+            .setCustomId(`giveaway_end_${currentGiveaway.messageId}`)
+            .setLabel('End Giveaway')
+            .setStyle(ButtonStyle.Danger);
+          
+          const row = new ActionRowBuilder().addComponents(enterBtn, entriesBtn, endBtn);
+          
+          await message.edit({ embeds: [updatedEmbed], components: [row] });
+        } catch (error) {
+          clearInterval(updateInterval);
+          console.error('Error updating giveaway embed:', error);
+        }
+      }, 1000);
+      
+      giveawayData.updateInterval = updateInterval;
 
       await interaction.reply({ content: `Giveaway created! Posted to the channel with role mention! Duration: ${durationText}`, flags: 64 });
       return;
