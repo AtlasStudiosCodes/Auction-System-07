@@ -57,7 +57,7 @@ const giveawayItemCategories = {
 // Item emojis mapping - customize with your server emojis
 const itemEmojis = {
   'Diamonds': '💎',
-  'Diamond': '💎',
+  'Diamond': '💎'
   //'HugeBlackHoleAngelus': '<:HugeBlackHoleAngelus:1461512580970618881>',
   // Add more emojis as needed - format: 'ItemName': '<:ItemName:ID>'
 };
