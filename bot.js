@@ -56,21 +56,9 @@ const giveawayItemCategories = {
 
 // Item emojis mapping - customize with your server emojis
 const itemEmojis = {
-  'HugeBlackHoleAngelus': '<:HugeBlackHoleAngelus:1461512580970618881>',
-  'HugeGoldenBlackHoleAngelus': '<:HugeGoldenBlackHoleAngelus:1461512580970618881>',
-  'HugeRainbowBlackHoleAngelus': '<:HugeRainbowBlackHoleAngelus:1461512580970618881>',
-  'HugeSnowGlobeHamster': '<:HugeSnowGlobeHamster:1461512580970618881>',
-  'HugeGoldenSnowGlobeHamster': '<:HugeGoldenSnowGlobeHamster:1461512580970618881>',
-  'HugeRainbowSnowGlobeHamster': '<:HugeRainbowSnowGlobeHamster:1461512580970618881>',
-  'HugeSnowGlobeCat': '<:HugeSnowGlobeCat:1461512580970618881>',
-  'HugeGoldenSnowGlobeCat': '<:HugeGoldenSnowGlobeCat:1461512580970618881>',
-  'HugeRainbowSnowGlobeCat': '<:HugeRainbowSnowGlobeCat:1461512580970618881>',
-  'HugeIceCubeGingerbreadCorgi': '<:HugeIceCubeGingerbreadCorgi:1461512580970618881>',
-  'HugeGoldenIceCubeGingerbreadCorgi': '<:HugeGoldenIceCubeGingerbreadCorgi:1461512580970618881>',
-  'HugeRainbowIceCubeGingerbreadCorgi': '<:HugeRainbowIceCubeGingerbreadCorgi:1461512580970618881>',
-  'HugeIceCubeCookieCutCat': '<:HugeIceCubeCookieCutCat:1461512580970618881>',
-  'HugeGoldenIceCubeCookieCutCat': '<:HugeGoldenIceCubeCookieCutCat:1461512580970618881>',
-  'HugeRainbowIceCubeCookieCutCat': '<:HugeRainbowIceCubeCookieCutCat:1461512580970618881>',
+  'Diamonds': '💎',
+  'Diamond': '💎',
+  //'HugeBlackHoleAngelus': '<:HugeBlackHoleAngelus:1461512580970618881>',
   // Add more emojis as needed - format: 'ItemName': '<:ItemName:ID>'
 };
 
@@ -91,17 +79,22 @@ function formatItemsText(items) {
   // Format items with emoji and name
   if (!items || items.length === 0) return 'None';
   
-    return items.map(item => {
-      if (typeof item === 'object') {
-        const emoji = getItemEmoji(item.name);
-        const formattedName = formatItemName(item.name);
-        return `${emoji} **${formattedName}** (**x${item.quantity}**)`;
-      } else {
-        const emoji = getItemEmoji(item);
-        const formattedName = formatItemName(item);
-        return `${emoji} **${formattedName}**`;
+  return items.map(item => {
+    if (typeof item === 'object') {
+      const emoji = getItemEmoji(item.name) || (item.name && item.name.toLowerCase().includes('diamond') ? '💎' : '');
+      const formattedName = formatItemName(item.name);
+      const qty = typeof item.quantity === 'number' ? formatBid(item.quantity) : item.quantity;
+      // Special-case diamonds to show diamond emoji and abbreviated amount
+      if (formattedName.toLowerCase().includes('diamond')) {
+        return `${emoji} **${formattedName}** (**x${qty}**)`;
       }
-    }).join('\n') || 'None';
+      return `${emoji} **${formattedName}** (**x${qty}**)`;
+    } else {
+      const emoji = getItemEmoji(item);
+      const formattedName = formatItemName(item);
+      return `${emoji} **${formattedName}**`;
+    }
+  }).join('\n');
 }
 
 // Save data every 5 minutes
@@ -328,6 +321,23 @@ client.on('messageCreate', async (message) => {
         .setTitle('🎪 Auction Proof')
         .setDescription(`**Winner:** ${message.author}\n\n**Note:** ${proofData.description || 'No description provided'}`)
         .setColor(0x00ff00)
+        .setImage(attachment.url)
+        .setFooter({ text: `Submitted by ${message.author.username}` })
+        .setTimestamp();
+    } else if (proofData.type === 'giveaway') {
+      const giveawayProofChannelId = '1461849894615646309';
+      proofChannel = guild.channels.cache.get(giveawayProofChannelId);
+
+      if (!proofChannel) {
+        delete message.author.waitingForProof;
+        return message.reply('❌ Giveaway proof channel not found.');
+      }
+
+      // Create proof embed for giveaway
+      proofEmbed = new EmbedBuilder()
+        .setTitle('🎁 Giveaway Proof')
+        .setDescription(`**Giveaway ID:** ${proofData.giveawayMessageId}\n\n**Note:** ${proofData.description || 'No description provided'}`)
+        .setColor(0xFF1493)
         .setImage(attachment.url)
         .setFooter({ text: `Submitted by ${message.author.username}` })
         .setTimestamp();
@@ -1123,40 +1133,26 @@ client.on('interactionCreate', async (interaction) => {
         const embed = new EmbedBuilder()
           .setTitle('🎁 Giveaway Ended!')
           .setColor(0xFF1493)
-          .setDescription(`**Winner:** ${winner.user}`)
           .setFooter({ text: 'Version 1.0.9 | Made By Atlas' });
 
-        // Format items with emojis and quantities, include diamonds
-        let itemsText = formatItemsText(giveaway.items);
-        // If no item entries, start with empty so diamonds show cleanly
-        if ((!giveaway.items || giveaway.items.length === 0) && itemsText === 'None') itemsText = '';
-        if (giveaway.diamonds && giveaway.diamonds > 0) {
-          const formatted = formatBid(giveaway.diamonds);
-          itemsText = itemsText ? `${itemsText}\n💎 **Diamonds** (**x${formatted}**)` : `💎 **Diamonds** (**x${formatted}**)`;
-        }
-        if (!itemsText) itemsText = 'None';
+        // Winner field
+        embed.addFields({ name: 'Winner', value: `${winner.user}`, inline: false });
 
-        embed.addFields({
-          name: 'Giveaway Items',
-          value: itemsText,
-          inline: false
-        });
+        // List items with emojis and formatted quantities
+        const itemsText = giveaway.items && giveaway.items.length > 0 ? formatItemsText(giveaway.items) : 'None';
+        embed.addFields({ name: 'Giveaway Items', value: itemsText, inline: false });
 
-        embed.addFields({
-          name: 'Total Entries',
-          value: giveaway.entries.length.toString(),
-          inline: true
-        });
+        embed.addFields({ name: 'Total Entries', value: giveaway.entries.length.toString(), inline: true });
+
+        // Add Upload Proof Image button
+        const proofButton = new ButtonBuilder()
+          .setCustomId(`upload_proof_giveaway_${messageId}`)
+          .setLabel('Upload Proof Image')
+          .setStyle(ButtonStyle.Primary);
+
+        const row = new ActionRowBuilder().addComponents(proofButton);
 
         if (channel) {
-          // Add upload proof button
-          const uploadProofButton = new ButtonBuilder()
-            .setCustomId(`upload_proof_giveaway_${messageId}`)
-            .setLabel('Upload Proof Image')
-            .setStyle(ButtonStyle.Primary);
-
-          const row = new ActionRowBuilder().addComponents(uploadProofButton);
-
           await channel.send({ embeds: [embed], components: [row] });
           await channel.send(`🎉 Congratulations ${winner.user}! You won the giveaway!`);
         }
@@ -1443,27 +1439,10 @@ client.on('interactionCreate', async (interaction) => {
       await interaction.showModal(modal);
     }
 
-    if (interaction.customId.startsWith('upload_proof_auction_')) {
-      // Show modal for image description
-      const modal = new ModalBuilder()
-        .setCustomId('proof_image_modal_auction')
-        .setTitle('Upload Proof Image');
-
-      const descriptionInput = new TextInputBuilder()
-        .setCustomId('proof_description')
-        .setLabel('Description (optional)')
-        .setStyle(TextInputStyle.Paragraph)
-        .setPlaceholder('Add any notes about this auction...')
-        .setRequired(false);
-
-      const row = new ActionRowBuilder().addComponents(descriptionInput);
-      modal.addComponents(row);
-
-      await interaction.showModal(modal);
-    }
-
     if (interaction.customId.startsWith('upload_proof_giveaway_')) {
       const messageId = interaction.customId.replace('upload_proof_giveaway_', '');
+      const giveaway = giveaways.get(messageId);
+      if (!giveaway) return interaction.reply({ content: 'Giveaway not found.', ephemeral: true });
 
       // Show modal for image description
       const modal = new ModalBuilder()
@@ -1475,6 +1454,25 @@ client.on('interactionCreate', async (interaction) => {
         .setLabel('Description (optional)')
         .setStyle(TextInputStyle.Paragraph)
         .setPlaceholder('Add any notes about this giveaway...')
+        .setRequired(false);
+
+      const row = new ActionRowBuilder().addComponents(descriptionInput);
+      modal.addComponents(row);
+
+      await interaction.showModal(modal);
+    }
+
+    if (interaction.customId.startsWith('upload_proof_auction_')) {
+      // Show modal for image description
+      const modal = new ModalBuilder()
+        .setCustomId('proof_image_modal_auction')
+        .setTitle('Upload Proof Image');
+
+      const descriptionInput = new TextInputBuilder()
+        .setCustomId('proof_description')
+        .setLabel('Description (optional)')
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder('Add any notes about this auction...')
         .setRequired(false);
 
       const row = new ActionRowBuilder().addComponents(descriptionInput);
@@ -2062,18 +2060,10 @@ client.on('interactionCreate', async (interaction) => {
           .setMaxLength(4)
           .setRequired(true);
 
-        const diamondsInput = new TextInputBuilder()
-          .setCustomId('gwa_diamonds')
-          .setLabel('Diamonds (optional, supports K/M/B)')
-          .setStyle(TextInputStyle.Short)
-          .setPlaceholder('e.g., 50000 or 50k')
-          .setRequired(false);
-
         const row1 = new ActionRowBuilder().addComponents(descriptionInput);
         const row2 = new ActionRowBuilder().addComponents(durationInput);
-        const row3 = new ActionRowBuilder().addComponents(diamondsInput);
 
-        giveawayModal.addComponents(row1, row2, row3);
+        giveawayModal.addComponents(row1, row2);
         
         delete interaction.user.selectedGiveawayItems;
         delete interaction.user.selectedGiveawayCategory;
@@ -2750,7 +2740,7 @@ client.on('interactionCreate', async (interaction) => {
       const giveawayItems = interaction.user.giveawayItems || [];
       const description = interaction.fields.getTextInputValue('gwa_description') || '';
       const durationStr = interaction.fields.getTextInputValue('gwa_duration');
-      const diamondsStr = interaction.fields.getTextInputValue('gwa_diamonds') || '0';
+      
       // Validate duration
       let duration = parseInt(durationStr);
       if (isNaN(duration) || duration < 1 || duration > 1440) {
@@ -2765,12 +2755,6 @@ client.on('interactionCreate', async (interaction) => {
       delete interaction.user.selectedGiveawayCategory;
       delete interaction.user.selectedGiveawaySubcategory;
 
-      // Parse diamonds (supports K/M/B) and keep for giveaway
-      let diamonds = 0;
-      if (diamondsStr && diamondsStr !== '0') {
-        diamonds = parseBid(diamondsStr);
-      }
-
       // Create giveaway embed
       const embed = new EmbedBuilder()
         .setTitle('🎁 Giveaway')
@@ -2779,15 +2763,8 @@ client.on('interactionCreate', async (interaction) => {
         .setFooter({ text: 'Version 1.0.9 | Made By Atlas' })
         .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
-      // Format giveaway items and diamonds
-      let giveawayItemsText = formatItemsText(giveawayItems);
-      // If no item entries, start with empty string so diamonds show cleanly
-      if ((!giveawayItems || giveawayItems.length === 0) && giveawayItemsText === 'None') giveawayItemsText = '';
-      if (diamonds > 0) {
-        const formatted = formatBid(diamonds);
-        giveawayItemsText = giveawayItemsText ? `${giveawayItemsText}\n💎 **Diamonds** (**x${formatted}**)` : `💎 **Diamonds** (**x${formatted}**)`;
-      }
-      if (!giveawayItemsText) giveawayItemsText = 'None';
+      // Format giveaway items
+      const giveawayItemsText = formatItemsText(giveawayItems);
 
       embed.addFields({
         name: 'Giveaway Items',
@@ -2838,7 +2815,6 @@ client.on('interactionCreate', async (interaction) => {
       const giveawayData = {
         host: interaction.user,
         items: giveawayItems,
-        diamonds: diamonds,
         channelId: targetChannel.id,
         messageId: message.id,
         entries: [],
@@ -2891,40 +2867,26 @@ client.on('interactionCreate', async (interaction) => {
           const winnerEmbed = new EmbedBuilder()
             .setTitle('🎁 Giveaway Ended!')
             .setColor(0xFF1493)
-            .setDescription(`**Winner:** ${winner.user}`)
             .setFooter({ text: 'Version 1.0.9 | Made By Atlas' });
 
-          // Format items with emojis and quantities, include diamonds
-          let itemsText = formatItemsText(giveaway.items);
-          // If no item entries, start with empty so diamonds show cleanly
-          if ((!giveaway.items || giveaway.items.length === 0) && itemsText === 'None') itemsText = '';
-          if (giveaway.diamonds && giveaway.diamonds > 0) {
-            const formatted = formatBid(giveaway.diamonds);
-            itemsText = itemsText ? `${itemsText}\n💎 **Diamonds** (**x${formatted}**)` : `💎 **Diamonds** (**x${formatted}**)`;
-          }
-          if (!itemsText) itemsText = 'None';
+          // Winner field
+          winnerEmbed.addFields({ name: 'Winner', value: `${winner.user}`, inline: false });
 
-          winnerEmbed.addFields({
-            name: 'Giveaway Items',
-            value: itemsText,
-            inline: false
-          });
+          // List items with emojis and formatted quantities
+          const itemsText = giveaway.items && giveaway.items.length > 0 ? formatItemsText(giveaway.items) : 'None';
+          winnerEmbed.addFields({ name: 'Giveaway Items', value: itemsText, inline: false });
 
-          winnerEmbed.addFields({
-            name: 'Total Entries',
-            value: giveaway.entries.length.toString(),
-            inline: true
-          });
+          winnerEmbed.addFields({ name: 'Total Entries', value: giveaway.entries.length.toString(), inline: true });
 
-          // Add upload proof button
-          const uploadProofButton = new ButtonBuilder()
+          // Add Upload Proof Image button
+          const proofButton = new ButtonBuilder()
             .setCustomId(`upload_proof_giveaway_${message.id}`)
             .setLabel('Upload Proof Image')
             .setStyle(ButtonStyle.Primary);
 
-          const row = new ActionRowBuilder().addComponents(uploadProofButton);
+          const proofRow = new ActionRowBuilder().addComponents(proofButton);
 
-          await channel.send({ embeds: [winnerEmbed], components: [row] });
+          await channel.send({ embeds: [winnerEmbed], components: [proofRow] });
           await channel.send(`🎉 Congratulations ${winner.user}! You won the giveaway!`);
         }
 
@@ -3243,6 +3205,24 @@ client.on('interactionCreate', async (interaction) => {
       };
     }
 
+    if (interaction.customId.startsWith('proof_image_modal_giveaway_')) {
+      const messageId = interaction.customId.replace('proof_image_modal_giveaway_', '');
+      const description = interaction.fields.getTextInputValue('proof_description') || '';
+
+      // Show instruction
+      await interaction.reply({
+        content: '📸 Please attach the proof image to your next message in this channel.\n\nAfter you send the image, the proof will be automatically forwarded to the records channel.',
+        ephemeral: false
+      });
+
+      // Store waiting state
+      interaction.user.waitingForProof = {
+        giveawayMessageId: messageId,
+        description: description,
+        type: 'giveaway'
+      };
+    }
+
     if (interaction.customId === 'proof_image_modal_auction') {
       const description = interaction.fields.getTextInputValue('proof_description') || '';
 
@@ -3257,27 +3237,6 @@ client.on('interactionCreate', async (interaction) => {
         tradeMessageId: null,
         description: description,
         type: 'auction'
-      };
-    }
-
-    if (interaction.customId.startsWith('proof_image_modal_giveaway_')) {
-      const messageId = interaction.customId.replace('proof_image_modal_giveaway_', '');
-      const description = interaction.fields.getTextInputValue('proof_description') || '';
-      const giveaway = giveaways.get(messageId);
-
-      if (!giveaway) return interaction.reply({ content: 'Giveaway not found.', ephemeral: true });
-
-      // Show instruction
-      await interaction.reply({
-        content: '📸 Please attach the proof image to your next message in this channel.\n\nAfter you send the image, the proof will be automatically forwarded to the records channel.',
-        ephemeral: false
-      });
-
-      // Store waiting state
-      interaction.user.waitingForProof = {
-        giveawayMessageId: messageId,
-        description: description,
-        type: 'giveaway'
       };
     }
   }
