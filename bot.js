@@ -1568,6 +1568,43 @@ client.on('interactionCreate', async (interaction) => {
       await interaction.showModal(quantityModal);
     }
 
+    if (interaction.customId === 'trade_diamonds_continue_select') {
+      const choice = interaction.values[0];
+
+      if (choice === 'add_items_to_diamonds') {
+        const { StringSelectMenuBuilder } = require('discord.js');
+        
+        const categorySelect = new StringSelectMenuBuilder()
+          .setCustomId('trade_category_select_with_diamonds')
+          .setPlaceholder('Select an item category to add')
+          .addOptions([
+            { label: 'Huges', value: 'huges', emoji: '🔥' },
+            { label: 'Exclusives', value: 'exclusives', emoji: '✨' },
+            { label: 'Eggs', value: 'eggs', emoji: '🥚' },
+            { label: 'Gifts', value: 'gifts', emoji: '🎁' }
+          ]);
+
+        const row = new ActionRowBuilder().addComponents(categorySelect);
+        await interaction.reply({ content: 'Select an item category to add:', components: [row], flags: 64 });
+      } else if (choice === 'confirm_diamonds') {
+        // Move to target user confirmation
+        const diamondsModal = new ModalBuilder()
+          .setCustomId('trade_setup_modal_diamonds')
+          .setTitle('Complete Your Trade Offer');
+
+        const userInput = new TextInputBuilder()
+          .setCustomId('trade_target_user')
+          .setLabel('Target User (optional)')
+          .setStyle(TextInputStyle.Short)
+          .setPlaceholder('Leave empty for open trade')
+          .setRequired(false);
+
+        const row1 = new ActionRowBuilder().addComponents(userInput);
+        diamondsModal.addComponents(row1);
+        await interaction.showModal(diamondsModal);
+      }
+    }
+
     if (interaction.customId === 'trade_category_select') {
       const category = interaction.values[0];
       const { StringSelectMenuBuilder } = require('discord.js');
@@ -2708,43 +2745,6 @@ client.on('interactionCreate', async (interaction) => {
         components: [row], 
         flags: 64 
       });
-    }
-
-    if (interaction.customId === 'trade_diamonds_continue_select') {
-      const choice = interaction.values[0];
-
-      if (choice === 'add_items_to_diamonds') {
-        const { StringSelectMenuBuilder } = require('discord.js');
-        
-        const categorySelect = new StringSelectMenuBuilder()
-          .setCustomId('trade_category_select_with_diamonds')
-          .setPlaceholder('Select an item category to add')
-          .addOptions([
-            { label: 'Huges', value: 'huges', emoji: '🔥' },
-            { label: 'Exclusives', value: 'exclusives', emoji: '✨' },
-            { label: 'Eggs', value: 'eggs', emoji: '🥚' },
-            { label: 'Gifts', value: 'gifts', emoji: '🎁' }
-          ]);
-
-        const row = new ActionRowBuilder().addComponents(categorySelect);
-        await interaction.reply({ content: 'Select an item category to add:', components: [row], flags: 64 });
-      } else if (choice === 'confirm_diamonds') {
-        // Move to target user confirmation
-        const diamondsModal = new ModalBuilder()
-          .setCustomId('trade_setup_modal_diamonds')
-          .setTitle('Complete Your Trade Offer');
-
-        const userInput = new TextInputBuilder()
-          .setCustomId('trade_target_user')
-          .setLabel('Target User (optional)')
-          .setStyle(TextInputStyle.Short)
-          .setPlaceholder('Leave empty for open trade')
-          .setRequired(false);
-
-        const row1 = new ActionRowBuilder().addComponents(userInput);
-        diamondsModal.addComponents(row1);
-        await interaction.showModal(diamondsModal);
-      }
     }
 
     if (interaction.customId === 'trade_setup_modal') {
