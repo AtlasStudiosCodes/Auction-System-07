@@ -447,6 +447,10 @@ client.once('clientReady', async () => {
         }
       ]
     },
+    {
+      name: 'clearbotmessages',
+      description: 'Delete all bot messages in this channel (admin only)'
+    },
   ];
 
   await client.application.commands.set(commands);
@@ -916,6 +920,52 @@ client.on('interactionCreate', async (interaction) => {
 
       await interaction.reply({ embeds: [embed], components: [row] });
     }
+
+    if (commandName === 'clearbotmessages') {
+      const adminRoles = ['1461505505401896972', '1461481291118678087', '1461484563183435817'];
+      const hasAdminRole = interaction.member.roles.cache.some(role => adminRoles.includes(role.id));
+      if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', flags: 64 });
+
+      try {
+        await interaction.deferReply({ flags: 64 });
+
+        let deletedCount = 0;
+        let lastMessageId = null;
+
+        // Fetch and delete bot messages in batches
+        while (true) {
+          const options = { limit: 100 };
+          if (lastMessageId) {
+            options.before = lastMessageId;
+          }
+
+          const messages = await interaction.channel.messages.fetch(options);
+          if (messages.size === 0) break;
+
+          for (const message of messages.values()) {
+            if (message.author.id === client.user.id) {
+              try {
+                await message.delete();
+                deletedCount++;
+              } catch (error) {
+                console.error('Error deleting message:', error);
+              }
+            }
+          }
+
+          lastMessageId = messages.last().id;
+        }
+
+        await interaction.editReply({ 
+          content: `✅ Deletadas ${deletedCount} mensagem(ns) do bot neste canal.`
+        });
+      } catch (error) {
+        console.error('Error in clearbotmessages:', error);
+        await interaction.editReply({ 
+          content: 'Erro ao tentar deletar as mensagens do bot.' 
+        });
+      }
+    }
   }
 
   if (interaction.isButton()) {
@@ -1024,6 +1074,7 @@ client.on('interactionCreate', async (interaction) => {
         .setCustomId('trade_category_select')
         .setPlaceholder('Select an item category')
         .addOptions([
+          { label: 'Diamonds', value: 'diamonds', emoji: '💎' },
           { label: 'Huges', value: 'huges', emoji: '🔥' },
           { label: 'Exclusives', value: 'exclusives', emoji: '✨' },
           { label: 'Eggs', value: 'eggs', emoji: '🥚' },
@@ -1396,6 +1447,25 @@ client.on('interactionCreate', async (interaction) => {
       const category = interaction.values[0];
       const { StringSelectMenuBuilder } = require('discord.js');
       
+      // Handle diamonds
+      if (category === 'diamonds') {
+        const diamondsModal = new ModalBuilder()
+          .setCustomId('trade_diamonds_modal')
+          .setTitle('Add Diamonds to Trade');
+
+        const diamondsInput = new TextInputBuilder()
+          .setCustomId('trade_diamonds_amount')
+          .setLabel('Amount of Diamonds')
+          .setStyle(TextInputStyle.Short)
+          .setPlaceholder('10000')
+          .setRequired(true);
+
+        const row = new ActionRowBuilder().addComponents(diamondsInput);
+        diamondsModal.addComponents(row);
+        await interaction.showModal(diamondsModal);
+        return;
+      }
+      
       let items = [];
       if (category === 'huges') {
         // Para huges, mostrar subcategorias
@@ -1440,6 +1510,89 @@ client.on('interactionCreate', async (interaction) => {
 
       const row = new ActionRowBuilder().addComponents(itemSelect);
       await interaction.reply({ content: `Select items from **${subcategory}**:`, components: [row], flags: 64 });
+    }
+
+    if (interaction.customId === 'trade_category_select_with_diamonds') {
+      const category = interaction.values[0];
+      const { StringSelectMenuBuilder } = require('discord.js');
+      
+      let items = [];
+      if (category === 'huges') {
+        // Para huges, mostrar subcategorias
+        const subcategorySelect = new StringSelectMenuBuilder()
+          .setCustomId('trade_huge_subcategory_select_with_diamonds')
+          .setPlaceholder('Select a Huge subcategory')
+          .addOptions(Object.keys(itemCategories.huges).map(sub => ({
+            label: sub,
+            value: sub
+          })));
+        const row = new ActionRowBuilder().addComponents(subcategorySelect);
+        await interaction.reply({ content: `Select a subcategory from **Huges**:`, components: [row], flags: 64 });
+        return;
+      } else {
+        items = itemCategories[category];
+      }
+      
+      // Para outras categorias
+      const itemSelect = new StringSelectMenuBuilder()
+        .setCustomId(`trade_item_select_with_diamonds_${category}`)
+        .setPlaceholder(`Select items from ${category}`)
+        .setMaxValues(Math.min(items.length, 25))
+        .addOptions(items.slice(0, 25).map(item => ({ label: item, value: item })));
+
+      const row = new ActionRowBuilder().addComponents(itemSelect);
+      await interaction.reply({ content: `Select items from **${category}** category:`, components: [row], flags: 64 });
+    }
+
+    if (interaction.customId === 'trade_huge_subcategory_select_with_diamonds') {
+      const subcategory = interaction.values[0];
+      const { StringSelectMenuBuilder } = require('discord.js');
+      
+      const items = itemCategories.huges[subcategory];
+      const itemSelect = new StringSelectMenuBuilder()
+        .setCustomId(`trade_item_select_with_diamonds_huges_${subcategory}`)
+        .setPlaceholder(`Select items from ${subcategory}`)
+        .setMaxValues(Math.min(items.length, 25))
+        .addOptions(items.map(item => ({
+          label: item,
+          value: item
+        })));
+
+      const row = new ActionRowBuilder().addComponents(itemSelect);
+      await interaction.reply({ content: `Select items from **${subcategory}**:`, components: [row], flags: 64 });
+    }
+
+    if (interaction.customId.startsWith('trade_item_select_with_diamonds_')) {
+      const parts = interaction.customId.replace('trade_item_select_with_diamonds_', '').split('_');
+      let category = parts[0];
+      let subcategory = parts.length > 1 ? parts.slice(1).join('_') : null;
+      
+      const selectedItems = interaction.values;
+
+      // Store items selection for quantity input
+      interaction.user.selectedTradeItems = selectedItems;
+      interaction.user.selectedTradeCategory = category;
+      interaction.user.selectedTradeSubcategory = subcategory;
+
+      // Show quantity selection modal
+      const quantityModal = new ModalBuilder()
+        .setCustomId(`trade_item_quantities_modal_with_diamonds`)
+        .setTitle('Select Quantities');
+
+      let inputs = [];
+      selectedItems.slice(0, 5).forEach((item, index) => {
+        const input = new TextInputBuilder()
+          .setCustomId(`qty_${index}`)
+          .setLabel(`${item} quantity`)
+          .setStyle(TextInputStyle.Short)
+          .setPlaceholder('1')
+          .setRequired(true)
+          .setMaxLength(3);
+        inputs.push(new ActionRowBuilder().addComponents(input));
+      });
+
+      quantityModal.addComponents(inputs);
+      await interaction.showModal(quantityModal);
     }
 
     if (interaction.customId.startsWith('trade_item_select_')) {
@@ -1968,6 +2121,84 @@ client.on('interactionCreate', async (interaction) => {
       return;
     }
 
+    if (interaction.customId === 'trade_item_quantities_modal_with_diamonds') {
+      const selectedItems = interaction.user.selectedTradeItems || [];
+      const category = interaction.user.selectedTradeCategory;
+      const subcategory = interaction.user.selectedTradeSubcategory;
+
+      // Process quantities
+      const itemsWithQty = selectedItems.map((item, index) => {
+        const qty = parseInt(interaction.fields.getTextInputValue(`qty_${index}`) || '1');
+        return { name: item, quantity: Math.max(1, qty) };
+      });
+
+      // Store in user's session
+      if (!interaction.user.tradeItems) {
+        interaction.user.tradeItems = [];
+      }
+      interaction.user.tradeItems = interaction.user.tradeItems.concat(itemsWithQty);
+
+      // Show option to proceed or add more items
+      const { StringSelectMenuBuilder } = require('discord.js');
+      
+      const continueSelect = new StringSelectMenuBuilder()
+        .setCustomId('trade_continue_select_with_diamonds')
+        .setPlaceholder('What would you like to do?')
+        .addOptions([
+          { label: '✅ Confirm and Proceed', value: 'confirm_items_with_diamonds' },
+          { label: '➕ Add Another Category', value: 'add_category_to_diamonds' }
+        ]);
+
+      const row = new ActionRowBuilder().addComponents(continueSelect);
+      
+      const itemsEmbed = createItemsEmbed(interaction.user.tradeItems);
+
+      await interaction.reply({ 
+        content: `What would you like to do?`,
+        embeds: [itemsEmbed],
+        components: [row], 
+        flags: 64 
+      });
+      return;
+    }
+
+    if (interaction.customId === 'trade_continue_select_with_diamonds') {
+      const choice = interaction.values[0];
+
+      if (choice === 'add_category_to_diamonds') {
+        const { StringSelectMenuBuilder } = require('discord.js');
+        
+        const categorySelect = new StringSelectMenuBuilder()
+          .setCustomId('trade_category_select_with_diamonds')
+          .setPlaceholder('Select another item category')
+          .addOptions([
+            { label: 'Huges', value: 'huges', emoji: '🔥' },
+            { label: 'Exclusives', value: 'exclusives', emoji: '✨' },
+            { label: 'Eggs', value: 'eggs', emoji: '🥚' },
+            { label: 'Gifts', value: 'gifts', emoji: '🎁' }
+          ]);
+
+        const row = new ActionRowBuilder().addComponents(categorySelect);
+        await interaction.reply({ content: 'Select another item category:', components: [row], flags: 64 });
+      } else if (choice === 'confirm_items_with_diamonds') {
+        // Move to target user confirmation
+        const diamondsModal = new ModalBuilder()
+          .setCustomId('trade_setup_modal_diamonds')
+          .setTitle('Complete Your Trade Offer');
+
+        const userInput = new TextInputBuilder()
+          .setCustomId('trade_target_user')
+          .setLabel('Target User (optional)')
+          .setStyle(TextInputStyle.Short)
+          .setPlaceholder('Leave empty for open trade')
+          .setRequired(false);
+
+        const row1 = new ActionRowBuilder().addComponents(userInput);
+        diamondsModal.addComponents(row1);
+        await interaction.showModal(diamondsModal);
+      }
+    }
+
     if (interaction.customId === 'trade_item_quantities_modal') {
       const selectedItems = interaction.user.selectedTradeItems || [];
       const category = interaction.user.selectedTradeCategory;
@@ -2314,6 +2545,83 @@ client.on('interactionCreate', async (interaction) => {
       return;
     }
 
+    if (interaction.customId === 'trade_diamonds_modal') {
+      const diamondsStr = interaction.fields.getTextInputValue('trade_diamonds_amount');
+      const diamonds = parseBid(diamondsStr);
+
+      if (diamonds > MAX_DIAMONDS) {
+        return interaction.reply({ content: `Maximum diamonds allowed is ${formatBid(MAX_DIAMONDS)} 💎.`, flags: 64 });
+      }
+
+      if (diamonds <= 0) {
+        return interaction.reply({ content: 'You must enter a valid amount of diamonds.', flags: 64 });
+      }
+
+      // Store diamonds in user session
+      if (!interaction.user.tradeItems) {
+        interaction.user.tradeItems = [];
+      }
+      
+      interaction.user.tradeDiamonds = diamonds;
+      interaction.user.tradeDiamondsOnly = true;
+
+      // Show option to proceed or add items
+      const { StringSelectMenuBuilder } = require('discord.js');
+      
+      const continueSelect = new StringSelectMenuBuilder()
+        .setCustomId('trade_diamonds_continue_select')
+        .setPlaceholder('What would you like to do?')
+        .addOptions([
+          { label: '✅ Confirm and Proceed', value: 'confirm_diamonds' },
+          { label: '➕ Add Items', value: 'add_items_to_diamonds' }
+        ]);
+
+      const row = new ActionRowBuilder().addComponents(continueSelect);
+      
+      await interaction.reply({ 
+        content: `Trade offer with **${formatBid(diamonds)} 💎**\n\nWhat would you like to do?`,
+        components: [row], 
+        flags: 64 
+      });
+    }
+
+    if (interaction.customId === 'trade_diamonds_continue_select') {
+      const choice = interaction.values[0];
+
+      if (choice === 'add_items_to_diamonds') {
+        const { StringSelectMenuBuilder } = require('discord.js');
+        
+        const categorySelect = new StringSelectMenuBuilder()
+          .setCustomId('trade_category_select_with_diamonds')
+          .setPlaceholder('Select an item category to add')
+          .addOptions([
+            { label: 'Huges', value: 'huges', emoji: '🔥' },
+            { label: 'Exclusives', value: 'exclusives', emoji: '✨' },
+            { label: 'Eggs', value: 'eggs', emoji: '🥚' },
+            { label: 'Gifts', value: 'gifts', emoji: '🎁' }
+          ]);
+
+        const row = new ActionRowBuilder().addComponents(categorySelect);
+        await interaction.reply({ content: 'Select an item category to add:', components: [row], flags: 64 });
+      } else if (choice === 'confirm_diamonds') {
+        // Move to target user confirmation
+        const diamondsModal = new ModalBuilder()
+          .setCustomId('trade_setup_modal_diamonds')
+          .setTitle('Complete Your Trade Offer');
+
+        const userInput = new TextInputBuilder()
+          .setCustomId('trade_target_user')
+          .setLabel('Target User (optional)')
+          .setStyle(TextInputStyle.Short)
+          .setPlaceholder('Leave empty for open trade')
+          .setRequired(false);
+
+        const row1 = new ActionRowBuilder().addComponents(userInput);
+        diamondsModal.addComponents(row1);
+        await interaction.showModal(diamondsModal);
+      }
+    }
+
     if (interaction.customId === 'trade_setup_modal') {
       const diamondsStr = interaction.fields.getTextInputValue('trade_diamonds') || '0';
       const targetUsername = interaction.fields.getTextInputValue('trade_target_user') || '';
@@ -2327,6 +2635,80 @@ client.on('interactionCreate', async (interaction) => {
 
       const hostItems = interaction.user.tradeItems || [];
       delete interaction.user.tradeItems;
+      delete interaction.user.selectedTradeItems;
+      delete interaction.user.selectedTradeCategory;
+      delete interaction.user.selectedTradeSubcategory;
+
+      // Create trade embed
+      const embed = new EmbedBuilder()
+        .setTitle('Trade Offer')
+        .setDescription(`**Host:** ${interaction.user}\n**Status:** Waiting for offers`)
+        .setColor(0x0099ff)
+        .setFooter({ text: `Version ${getVersion('trade')} | Made By Atlas` })
+        .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
+
+      // Format host items with quantities
+      let hostItemsText = 'None';
+      if (hostItems.length > 0) {
+        hostItemsText = hostItems.map(item => formatItemDisplay(item)).join('\n');
+      }
+      
+      embed.addFields({
+        name: `Host Items${diamonds > 0 ? ` + ${formatBid(diamonds)} 💎` : ''}`,
+        value: hostItemsText || 'None',
+        inline: false
+      });
+
+      const offerButton = new ButtonBuilder()
+        .setCustomId('trade_offer_button')
+        .setLabel('Make Offer')
+        .setStyle(ButtonStyle.Primary);
+
+      const deleteButton = new ButtonBuilder()
+        .setCustomId(`trade_delete_${Date.now()}`)
+        .setLabel('Delete')
+        .setStyle(ButtonStyle.Danger);
+
+      const row = new ActionRowBuilder().addComponents(offerButton, deleteButton);
+
+      const targetChannel = redirectTradeChannelId ? interaction.guild.channels.cache.get(redirectTradeChannelId) : interaction.channel;
+      const message = await targetChannel.send({ embeds: [embed], components: [row] });
+
+      const trade = {
+        host: interaction.user,
+        hostDiamonds: diamonds,
+        hostItems: hostItems,
+        offers: [],
+        channelId: targetChannel.id,
+        messageId: message.id,
+        accepted: false,
+        acceptedUser: null,
+        targetUsername: targetUsername,
+        notificationMessages: []
+      };
+
+      trades.set(message.id, trade);
+
+      // Increment trade count for user
+      const currentCount = userTradeCount.get(interaction.user.id) || 0;
+      userTradeCount.set(interaction.user.id, currentCount + 1);
+      
+      // Update version
+      updateVersion('trade');
+
+      await interaction.reply({ content: `Trade offer created in ${targetChannel}! ${targetUsername ? `Awaiting response from ${targetUsername}.` : 'Open for all users.'}`, flags: 64 });
+      return;
+    }
+
+    if (interaction.customId === 'trade_setup_modal_diamonds') {
+      const targetUsername = interaction.fields.getTextInputValue('trade_target_user') || '';
+      const hostItems = interaction.user.tradeItems || [];
+      const diamonds = interaction.user.tradeDiamonds || 0;
+
+      // Clean up session
+      delete interaction.user.tradeItems;
+      delete interaction.user.tradeDiamonds;
+      delete interaction.user.tradeDiamondsOnly;
       delete interaction.user.selectedTradeItems;
       delete interaction.user.selectedTradeCategory;
       delete interaction.user.selectedTradeSubcategory;
