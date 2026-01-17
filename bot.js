@@ -1038,7 +1038,7 @@ client.on('interactionCreate', async (interaction) => {
         if (secondsAgo < 60) timeAgo = `${secondsAgo} seconds ago`;
         else if (secondsAgo < 3600) timeAgo = `${Math.floor(secondsAgo / 60)} minutes ago`;
         else timeAgo = `${Math.floor(secondsAgo / 3600)} hours ago`;
-        return `${bid.user.username}: ${bid.diamonds} 💎 - ${timeAgo}`;
+        return `${bid.user.displayName}: ${bid.diamonds} 💎 - ${timeAgo}`;
       }).join('\n');
 
       const embed = new EmbedBuilder()
@@ -1403,6 +1403,46 @@ client.on('interactionCreate', async (interaction) => {
       const row = new ActionRowBuilder().addComponents(categorySelect);
       await interaction.reply({ content: 'Select an item category to remove from your inventory:', components: [row], flags: 64 });
     }
+
+    // Cancel buttons
+    if (interaction.customId === 'cancel_trade') {
+      delete interaction.user.tradeItems;
+      delete interaction.user.selectedTradeItems;
+      delete interaction.user.selectedTradeCategory;
+      delete interaction.user.selectedTradeSubcategory;
+      await interaction.reply({ content: '❌ Trade creation cancelled. All items have been removed.', flags: 64 });
+    }
+
+    if (interaction.customId === 'cancel_trade_diamonds') {
+      delete interaction.user.tradeDiamonds;
+      delete interaction.user.tradeDiamondsOnly;
+      delete interaction.user.tradeItems;
+      await interaction.reply({ content: '❌ Trade creation cancelled. All items and diamonds have been removed.', flags: 64 });
+    }
+
+    if (interaction.customId === 'cancel_trade_setup') {
+      delete interaction.user.tradeDiamonds;
+      delete interaction.user.tradeDiamondsOnly;
+      delete interaction.user.tradeItems;
+      await interaction.reply({ content: '❌ Trade setup cancelled.', flags: 64 });
+    }
+
+    if (interaction.customId.startsWith('cancel_offer_')) {
+      delete interaction.user.offerTradeItems;
+      delete interaction.user.selectedOfferItems;
+      delete interaction.user.selectedOfferCategory;
+      delete interaction.user.selectedOfferSubcategory;
+      delete interaction.user.offerDiamonds;
+      await interaction.reply({ content: '❌ Offer creation cancelled. All items have been removed.', flags: 64 });
+    }
+
+    if (interaction.customId === 'cancel_inventory') {
+      delete interaction.user.inventoryItems;
+      delete interaction.user.selectedInventoryItems;
+      delete interaction.user.selectedInventoryCategory;
+      delete interaction.user.selectedInventorySubcategory;
+      await interaction.reply({ content: '❌ Inventory creation cancelled. All items have been removed.', flags: 64 });
+    }
   }
 
   if (interaction.isStringSelectMenu()) {
@@ -1484,7 +1524,15 @@ client.on('interactionCreate', async (interaction) => {
           ]);
 
         const row = new ActionRowBuilder().addComponents(categorySelect);
-        await interaction.reply({ content: 'Select an item category to add:', components: [row], flags: 64 });
+        
+        const cancelButton = new ButtonBuilder()
+          .setCustomId('cancel_trade_diamonds')
+          .setLabel('❌ Cancel')
+          .setStyle(ButtonStyle.Danger);
+
+        const row2 = new ActionRowBuilder().addComponents(cancelButton);
+        
+        await interaction.reply({ content: 'Select an item category to add:', components: [row, row2], flags: 64 });
       } else if (choice === 'confirm_diamonds') {
         // Move to target user confirmation
         const diamondsModal = new ModalBuilder()
@@ -1808,8 +1856,14 @@ client.on('interactionCreate', async (interaction) => {
             { label: 'Gifts', value: 'gifts', emoji: '🎁' }
           ]);
 
+        const cancelButton = new ButtonBuilder()
+          .setCustomId('cancel_trade')
+          .setLabel('❌ Cancel')
+          .setStyle(ButtonStyle.Danger);
+
         const row = new ActionRowBuilder().addComponents(categorySelect);
-        await interaction.reply({ content: 'Select another item category:', components: [row], flags: 64 });
+        const row2 = new ActionRowBuilder().addComponents(cancelButton);
+        await interaction.reply({ content: 'Select another item category:', components: [row, row2], flags: 64 });
       } else if (choice === 'confirm_items') {
         // Move to diamonds and target user
         const diamondsModal = new ModalBuilder()
@@ -1856,8 +1910,14 @@ client.on('interactionCreate', async (interaction) => {
             { label: 'Gifts', value: 'gifts', emoji: '🎁' }
           ]);
 
+        const cancelButton = new ButtonBuilder()
+          .setCustomId(`cancel_offer_${messageId}`)
+          .setLabel('❌ Cancel')
+          .setStyle(ButtonStyle.Danger);
+
         const row = new ActionRowBuilder().addComponents(categorySelect);
-        await interaction.reply({ content: 'Select another item category:', components: [row], flags: 64 });
+        const row2 = new ActionRowBuilder().addComponents(cancelButton);
+        await interaction.reply({ content: 'Select another item category:', components: [row, row2], flags: 64 });
       } else if (choice === 'confirm_items') {
         // Move to diamonds and submit
         const diamondsModal = new ModalBuilder()
@@ -1903,8 +1963,14 @@ client.on('interactionCreate', async (interaction) => {
             { label: 'Gifts', value: 'gifts', emoji: '🎁' }
           ]);
 
+        const cancelButton = new ButtonBuilder()
+          .setCustomId('cancel_inventory')
+          .setLabel('❌ Cancel')
+          .setStyle(ButtonStyle.Danger);
+
         const row = new ActionRowBuilder().addComponents(categorySelect);
-        await interaction.reply({ content: 'Select another item category:', components: [row], flags: 64 });
+        const row2 = new ActionRowBuilder().addComponents(cancelButton);
+        await interaction.reply({ content: 'Select another item category:', components: [row, row2], flags: 64 });
       } else if (choice === 'continue_to_setup') {
         // Move to inventory setup modal
         const inventoryModal = new ModalBuilder()
@@ -2072,7 +2138,7 @@ client.on('interactionCreate', async (interaction) => {
           .setDescription(`**Auction Winner:** ${auction.winnerUser}\n**Bid:** ${formatBid(auction.bids[0].diamonds)} 💎\n\n${imageUrl}`)
           .setColor(0xff0000)
           .setThumbnail(imageUrl)
-          .setFooter({ text: `Uploaded by ${interaction.user.username}` });
+          .setFooter({ text: `Uploaded by ${interaction.user.displayName}` });
 
         await imagesChannel.send({ embeds: [embed] });
 
@@ -2121,7 +2187,7 @@ client.on('interactionCreate', async (interaction) => {
           .setDescription(`**Host:** ${trade.host}\n**Guest:** ${trade.acceptedUser}\n\n${imageUrl}`)
           .setColor(0x00ff00)
           .setThumbnail(imageUrl)
-          .setFooter({ text: `Uploaded by ${interaction.user.username}` });
+          .setFooter({ text: `Uploaded by ${interaction.user.displayName}` });
 
         await imagesChannel.send({ embeds: [embed] });
 
@@ -2169,14 +2235,20 @@ client.on('interactionCreate', async (interaction) => {
           { label: '➕ Add Another Category', value: 'add_category' }
         ]);
 
+      const cancelButton = new ButtonBuilder()
+        .setCustomId('cancel_inventory')
+        .setLabel('❌ Cancel')
+        .setStyle(ButtonStyle.Danger);
+
       const row = new ActionRowBuilder().addComponents(continueSelect);
+      const row2 = new ActionRowBuilder().addComponents(cancelButton);
       
       const itemsEmbed = createItemsEmbed(interaction.user.inventoryItems);
 
       await interaction.reply({ 
         content: `What would you like to do?`,
         embeds: [itemsEmbed],
-        components: [row], 
+        components: [row, row2], 
         flags: 64 
       });
       return;
@@ -2210,7 +2282,13 @@ client.on('interactionCreate', async (interaction) => {
           { label: '➕ Add Another Category', value: 'add_category_to_diamonds' }
         ]);
 
+      const cancelButton = new ButtonBuilder()
+        .setCustomId('cancel_trade_diamonds')
+        .setLabel('❌ Cancel')
+        .setStyle(ButtonStyle.Danger);
+
       const row = new ActionRowBuilder().addComponents(continueSelect);
+      const row2 = new ActionRowBuilder().addComponents(cancelButton);
       
       const itemsEmbed = createItemsEmbed(interaction.user.tradeItems);
 
@@ -2239,8 +2317,14 @@ client.on('interactionCreate', async (interaction) => {
             { label: 'Gifts', value: 'gifts', emoji: '🎁' }
           ]);
 
+        const cancelButton = new ButtonBuilder()
+          .setCustomId('cancel_trade_setup')
+          .setLabel('❌ Cancel')
+          .setStyle(ButtonStyle.Danger);
+
         const row = new ActionRowBuilder().addComponents(categorySelect);
-        await interaction.reply({ content: 'Select another item category:', components: [row], flags: 64 });
+        const row2 = new ActionRowBuilder().addComponents(cancelButton);
+        await interaction.reply({ content: 'Select another item category:', components: [row, row2], flags: 64 });
       } else if (choice === 'confirm_items_with_diamonds') {
         // Move to target user confirmation
         const diamondsModal = new ModalBuilder()
@@ -2288,14 +2372,20 @@ client.on('interactionCreate', async (interaction) => {
           { label: '➕ Add Another Category', value: 'add_category' }
         ]);
 
+      const cancelButton = new ButtonBuilder()
+        .setCustomId('cancel_trade')
+        .setLabel('❌ Cancel')
+        .setStyle(ButtonStyle.Danger);
+
       const row = new ActionRowBuilder().addComponents(continueSelect);
+      const row2 = new ActionRowBuilder().addComponents(cancelButton);
       
       const itemsEmbed = createItemsEmbed(interaction.user.tradeItems);
 
       await interaction.reply({ 
         content: `What would you like to do?`,
         embeds: [itemsEmbed],
-        components: [row], 
+        components: [row, row2], 
         flags: 64 
       });
       return;
@@ -2330,14 +2420,20 @@ client.on('interactionCreate', async (interaction) => {
           { label: '➕ Add Another Category', value: 'add_category' }
         ]);
 
+      const cancelButton = new ButtonBuilder()
+        .setCustomId(`cancel_offer_${messageId}`)
+        .setLabel('❌ Cancel')
+        .setStyle(ButtonStyle.Danger);
+
       const row = new ActionRowBuilder().addComponents(continueSelect);
+      const row2 = new ActionRowBuilder().addComponents(cancelButton);
       
       const itemsEmbed = createItemsEmbed(interaction.user.offerTradeItems);
 
       await interaction.reply({ 
         content: `What would you like to do?`,
         embeds: [itemsEmbed],
-        components: [row], 
+        components: [row, row2], 
         flags: 64 
       });
       return;
@@ -2370,14 +2466,20 @@ client.on('interactionCreate', async (interaction) => {
           { label: '➕ Add Another Category', value: 'add_category' }
         ]);
 
+      const cancelButton = new ButtonBuilder()
+        .setCustomId('cancel_inventory')
+        .setLabel('❌ Cancel')
+        .setStyle(ButtonStyle.Danger);
+
       const row = new ActionRowBuilder().addComponents(continueSelect);
+      const row2 = new ActionRowBuilder().addComponents(cancelButton);
       
       const itemsEmbed = createItemsEmbed(interaction.user.inventoryItems);
 
       await interaction.reply({ 
         content: `What would you like to do?`,
         embeds: [itemsEmbed],
-        components: [row], 
+        components: [row, row2], 
         flags: 64 
       });
       return;
@@ -2448,11 +2550,11 @@ client.on('interactionCreate', async (interaction) => {
 
         if (previousInventory.robloxUsername) {
           embed.setAuthor({ 
-            name: interaction.user.username, 
+            name: interaction.user.displayName, 
             iconURL: `https://www.roblox.com/bust-thumbnails/v1/individual?userIds=${previousInventory.robloxUsername}&size=420x420&format=Png&isCircular=false` 
           });
         } else {
-          embed.setAuthor({ name: interaction.user.username, iconURL: interaction.user.displayAvatarURL() });
+          embed.setAuthor({ name: interaction.user.displayName, iconURL: interaction.user.displayAvatarURL() });
         }
 
         const itemsText = previousInventory.items.length > 0 ? previousInventory.items.map(item => 
@@ -2541,11 +2643,11 @@ client.on('interactionCreate', async (interaction) => {
 
       if (robloxUsername) {
         embed.setAuthor({ 
-          name: interaction.user.username, 
+          name: interaction.user.displayName, 
           iconURL: `https://www.roblox.com/bust-thumbnails/v1/individual?userIds=${robloxUsername}&size=420x420&format=Png&isCircular=false` 
         });
       } else {
-        embed.setAuthor({ name: interaction.user.username, iconURL: interaction.user.displayAvatarURL() });
+        embed.setAuthor({ name: interaction.user.displayName, iconURL: interaction.user.displayAvatarURL() });
       }
 
       const itemsText = inventoryItems.length > 0 ? inventoryItems.map(item => 
@@ -2637,11 +2739,17 @@ client.on('interactionCreate', async (interaction) => {
           { label: '➕ Add Items', value: 'add_items_to_diamonds' }
         ]);
 
+      const cancelButton = new ButtonBuilder()
+        .setCustomId('cancel_trade_setup')
+        .setLabel('❌ Cancel')
+        .setStyle(ButtonStyle.Danger);
+
       const row = new ActionRowBuilder().addComponents(continueSelect);
+      const row2 = new ActionRowBuilder().addComponents(cancelButton);
       
       await interaction.reply({ 
         content: `Trade offer with **${formatBid(diamonds)} 💎**\n\nWhat would you like to do?`,
-        components: [row], 
+        components: [row, row2], 
         flags: 64 
       });
     }
@@ -2827,7 +2935,13 @@ client.on('interactionCreate', async (interaction) => {
           { label: '➕ Add More', value: 'add_category' }
         ]);
 
+      const cancelButton = new ButtonBuilder()
+        .setCustomId(`cancel_offer_${messageId}`)
+        .setLabel('❌ Cancel')
+        .setStyle(ButtonStyle.Danger);
+
       const row = new ActionRowBuilder().addComponents(continueSelect);
+      const row2 = new ActionRowBuilder().addComponents(cancelButton);
       
       let displayText = `**Your Offer So Far:**\n`;
       if (interaction.user.offerDiamonds > 0) {
@@ -2841,7 +2955,7 @@ client.on('interactionCreate', async (interaction) => {
 
       await interaction.reply({ 
         content: displayText + `\nWhat would you like to do?`,
-        components: [row], 
+        components: [row, row2], 
         flags: 64 
       });
       return;
@@ -3064,7 +3178,7 @@ async function updateTradeEmbed(guild, trade, messageId) {
       const lastOffer = trade.offers[trade.offers.length - 1];
       const guestItemsText = lastOffer.items.length > 0 ? lastOffer.items.map(item => formatItemDisplay(item)).join('\n') : 'None';
       embed.addFields({
-        name: `${lastOffer.user.username}${lastOffer.diamonds > 0 ? ` (+ ${formatBid(lastOffer.diamonds)} 💎)` : ''}`,
+        name: `${lastOffer.user.displayName}${lastOffer.diamonds > 0 ? ` (+ ${formatBid(lastOffer.diamonds)} 💎)` : ''}`,
         value: guestItemsText || 'None',
         inline: true
       });
@@ -3073,7 +3187,7 @@ async function updateTradeEmbed(guild, trade, messageId) {
       if (acceptedOffer) {
         const guestItemsText = acceptedOffer.items.length > 0 ? acceptedOffer.items.map(item => formatItemDisplay(item)).join('\n') : 'None';
         embed.addFields({
-          name: `${acceptedOffer.user.username}${acceptedOffer.diamonds > 0 ? ` (+ ${formatBid(acceptedOffer.diamonds)} 💎)` : ''}`,
+          name: `${acceptedOffer.user.displayName}${acceptedOffer.diamonds > 0 ? ` (+ ${formatBid(acceptedOffer.diamonds)} 💎)` : ''}`,
           value: guestItemsText || 'None',
           inline: true
         });
