@@ -592,6 +592,14 @@ client.on('interactionCreate', async (interaction) => {
             customId: 'create_inventory',
             buttonLabel: 'Create Inventory',
             versionKey: 'inventory'
+          },
+          {
+            title: '🎁 Giveaway System Setup',
+            color: 0xFF1493,
+            description: 'Welcome to the giveaway system!\n\n**How it works:**\n- Create a giveaway with items you want to give away.\n- Set a duration for the giveaway.\n- Other users can enter the giveaway.\n- When the time expires, a random winner is selected.\n- Upload proof of completion when the giveaway ends.\n\nClick the button below to create a new giveaway.',
+            customId: 'giveaway_setup_start',
+            buttonLabel: 'Create Giveaway',
+            versionKey: 'giveaway'
           }
         ];
 
@@ -1375,17 +1383,13 @@ client.on('interactionCreate', async (interaction) => {
       const embed = new EmbedBuilder()
         .setTitle('🎁 Giveaway Ended!')
         .setColor(0xFF1493)
-        .setDescription(`**Winner:** ${winner.user}`)
         .setFooter({ text: 'Version 1.0.9 | Made By Atlas' });
 
-      // List items
-      let itemsText = 'None';
-      if (giveaway.items.length > 0) {
-        itemsText = giveaway.items.map(item => 
-          typeof item === 'object' ? `${item.name} x${item.quantity}` : item
-        ).join('\n');
-      }
+      // Winner field
+      embed.addFields({ name: 'Winner', value: `**${winner.user}**`, inline: false });
 
+      // List items with proper formatting (bold + abbrev for diamonds)
+      const itemsText = giveaway.items && giveaway.items.length > 0 ? formatItemsText(giveaway.items) : 'None';
       embed.addFields({
         name: 'Giveaway Items',
         value: itemsText,
@@ -1735,10 +1739,17 @@ client.on('interactionCreate', async (interaction) => {
         return interaction.reply({ content: 'Only the host or winner can upload proof.', ephemeral: true });
       }
 
-      // Show modal for image description
+      // Show modal for image URL
       const modal = new ModalBuilder()
-        .setCustomId('proof_image_modal_giveaway')
+        .setCustomId(`proof_image_modal_giveaway_${messageId}`)
         .setTitle('Upload Proof Image');
+
+      const imageUrlInput = new TextInputBuilder()
+        .setCustomId('proof_image_url')
+        .setLabel('Image URL')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('https://imgur.com/...')
+        .setRequired(true);
 
       const descriptionInput = new TextInputBuilder()
         .setCustomId('proof_description')
@@ -1747,8 +1758,9 @@ client.on('interactionCreate', async (interaction) => {
         .setPlaceholder('Add any notes about this giveaway...')
         .setRequired(false);
 
-      const row = new ActionRowBuilder().addComponents(descriptionInput);
-      modal.addComponents(row);
+      const row1 = new ActionRowBuilder().addComponents(imageUrlInput);
+      const row2 = new ActionRowBuilder().addComponents(descriptionInput);
+      modal.addComponents(row1, row2);
 
       await interaction.showModal(modal);
     }
@@ -3038,6 +3050,15 @@ client.on('interactionCreate', async (interaction) => {
         inline: false
       });
 
+      // Add creator description if provided
+      if (description) {
+        embed.addFields({
+          name: 'Description',
+          value: description,
+          inline: false
+        });
+      }
+
       // Add duration field
       embed.addFields({
         name: 'Time Remaining',
@@ -3140,16 +3161,12 @@ client.on('interactionCreate', async (interaction) => {
               const endEmbed = new EmbedBuilder()
                 .setTitle('🎁 Giveaway Ended!')
                 .setColor(0xFF1493)
-                .setDescription(`**Winner:** ${winner.user}`)
                 .setFooter({ text: 'Version 1.0.9 | Made By Atlas' });
               
-              let itemsText = 'None';
-              if (currentGiveaway.items.length > 0) {
-                itemsText = currentGiveaway.items.map(item => 
-                  typeof item === 'object' ? `${item.name} x${item.quantity}` : item
-                ).join('\n');
-              }
+              // Winner field
+              endEmbed.addFields({ name: 'Winner', value: `**${winner.user}**`, inline: false });
               
+              const itemsText = currentGiveaway.items && currentGiveaway.items.length > 0 ? formatItemsText(currentGiveaway.items) : 'None';
               endEmbed.addFields({
                 name: 'Giveaway Items',
                 value: itemsText,
@@ -3506,21 +3523,61 @@ client.on('interactionCreate', async (interaction) => {
       };
     }
 
-    if (interaction.customId === 'proof_image_modal_giveaway') {
+    if (interaction.customId.startsWith('proof_image_modal_giveaway_')) {
+      const messageId = interaction.customId.replace('proof_image_modal_giveaway_', '');
+      const imageUrl = interaction.fields.getTextInputValue('proof_image_url') || '';
       const description = interaction.fields.getTextInputValue('proof_description') || '';
+      const giveawayData = finishedGiveaways.get(messageId);
 
-      // Show instruction
-      await interaction.reply({
-        content: '📸 Please attach the proof image to your next message in this channel.\n\nAfter you send the image, the proof will be automatically forwarded to the records channel.',
-        ephemeral: false
-      });
+      if (!giveawayData) {
+        return interaction.reply({ content: 'Giveaway not found.', ephemeral: true });
+      }
 
-      // Store waiting state
-      interaction.user.waitingForProof = {
-        giveawayProofMessageId: interaction.message?.id || null,
-        description: description,
-        type: 'giveaway'
-      };
+      // Validate URL
+      if (!imageUrl) {
+        return interaction.reply({ content: '❌ Please provide a valid image URL.', ephemeral: true });
+      }
+
+      try {
+        const channel = interaction.guild.channels.cache.get(giveawayData.channelId);
+        if (!channel) {
+          return interaction.reply({ content: '❌ Giveaway channel not found.', ephemeral: true });
+        }
+
+        // Fetch the original giveaway message
+        const giveawayMessage = await channel.messages.fetch(messageId);
+        if (!giveawayMessage) {
+          return interaction.reply({ content: '❌ Giveaway message not found.', ephemeral: true });
+        }
+
+        // Update thumbnail of the giveaway embed
+        if (giveawayMessage.embeds.length > 0) {
+          const updatedEmbed = EmbedBuilder.from(giveawayMessage.embeds[0])
+            .setThumbnail(imageUrl);
+          await giveawayMessage.edit({ embeds: [updatedEmbed] });
+        }
+
+        // Send proof to records channel
+        const proofChannelId = '1461849894615646309';
+        const proofChannel = interaction.guild.channels.cache.get(proofChannelId);
+
+        if (proofChannel) {
+          const proofEmbed = new EmbedBuilder()
+            .setTitle('🎁 Giveaway Proof')
+            .setDescription(`**Host:** ${giveawayData.host}\n**Winner:** ${giveawayData.winner}\n\n**Note:** ${description || 'No description provided'}`)
+            .setColor(0xFF1493)
+            .setImage(imageUrl)
+            .setFooter({ text: `Submitted by ${interaction.user.username}` })
+            .setTimestamp();
+
+          await proofChannel.send({ embeds: [proofEmbed] });
+        }
+
+        await interaction.reply({ content: '✅ Proof image has been submitted and the giveaway thumbnail updated!', ephemeral: true });
+      } catch (error) {
+        console.error('Error processing giveaway proof:', error);
+        await interaction.reply({ content: '❌ Error processing proof image.', ephemeral: true });
+      }
     }
 
     if (interaction.customId === 'giveaway_diamonds_modal') {
