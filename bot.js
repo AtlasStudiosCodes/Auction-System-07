@@ -48,9 +48,9 @@ const hugeImages = {
   
   // Snow Globe Huges
   'HugeSnowGlobeHamster': '<:HugeSnowGlobeHamster:1462106218356281374>',
-  'HugeRainbowSnowGlobeHamster':'<:HugeRainbowSnowGlobeHamster:00000000000000000>',
+  //'HugeRainbowSnowGlobeHamster':'<:HugeRainbowSnowGlobeHamster:00000000000000000>',
   'HugeSnowGlobeCat': '<:HugeSnowGlobeCat:1462107033728975075>',
-  'HugeRainbowSnowGlobeCat': '<:HugeRainbowSnowGlobeCat:00000000000000000>',
+  //'HugeRainbowSnowGlobeCat': '<:HugeRainbowSnowGlobeCat:00000000000000000>',
   
   // Ice Cube Huges
   'HugeIceCubeGingerbreadCorgi': '<:HugeIceCubeGingerbreadCorgi:1462106451693535325>',
