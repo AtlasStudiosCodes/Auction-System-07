@@ -12,6 +12,7 @@ let redirectTradeChannelId = config.defaultTradeChannelId || null;
 let redirectInventoryChannelId = null;
 
 const auctions = new Map(); // channelId -> { host, title, description, model, time, startingPrice, bids: [{user, diamonds, items}], timer, started, channelId, messageId, updateInterval }
+const finishedAuctions = new Map(); // messageId -> { host, title, winner, diamonds, items, channelId, auctionMessageId }
 const trades = new Map(); // messageId -> { host, hostDiamonds, hostItems, offers: [{user, diamonds, items, timestamp}], channelId, messageId, accepted: false, acceptedUser: null }
 const inventories = new Map(); // userId -> { messageId, channelId, items, diamonds, lookingFor, robloxUsername, lastEdited }
 const userTradeCount = new Map(); // userId -> count of active trades
@@ -39,15 +40,15 @@ const itemCategories = {
 // Giveaway item categories (for /setupgiveaway)
 const giveawayItemCategories = {
   huges: {
-    'Black Hole Huges': ['HugeBlackHoleAngelus', 'HugeGoldenBlackHoleAngelus', 'HugeRainbowBlackHoleAngelus'],
-    'Snow Globe Huges': ['HugeSnowGlobeHamster', 'HugeGoldenSnowGlobeHamster', 'HugeRainbowSnowGlobeHamster', 'HugeSnowGlobeCat', 'HugeGoldenSnowGlobeCat', 'HugeRainbowSnowGlobeCat'],
-    'Ice Cube Huges': ['HugeIceCubeGingerbreadCorgi', 'HugeGoldenIceCubeGingerbreadCorgi', 'HugeRainbowIceCubeGingerbreadCorgi', 'HugeIceCubeCookieCutCat', 'HugeGoldenIceCubeCookieCutCat', 'HugeRainbowIceCubeCookieCutCat'],
-    'Jelly Huges': ['HugeJellyDragon', 'HugeGoldenJellyDragon', 'HugeRainbowJellyDragon', 'HugeJellyKitsune', 'HugeGoldenJellyKitsune', 'HugeRainbowJellyKitsune'],
-    'Blazing Huges': ['HugeBlazingShark', 'HugeGoldenBlazingShark', 'HugeRainbowBlazingShark', 'HugeBlazingBat', 'HugeGoldenBlazingBat', 'HugeRainbowBlazingBat'],
-    'Event Huges': ['HugePartyCat', 'HugeGoldenPartyCat', 'HugeRainbowPartyCat', 'HugePartyDragon', 'HugeGoldenPartyDragon', 'HugeRainbowPartyDragon', 'HugeHellRock', 'HugeGoldenHellRock', 'HugeRainbowHellRock', 'HugeNinjaCat', 'HugeGoldenNinjaCat', 'HugeRainbowNinjaCat'],
-    'Christmas.1 Huges': ['HugePresentChestMimic', 'HugeGoldenPresentChestMimic', 'HugeRainbowPresentChestMimic', 'HugeGingerbreadAngelus', 'HugeGoldenGingerbreadAngelus', 'HugeRainbowGingerbreadAngelus', 'HugeNorthPoleWolf', 'HugeGoldenNorthPoleWolf', 'HugeRainbowNorthPoleWolf'],
+    'Black Hole Huges': ['HugeBlackHoleAngelus', 'HugeRainbowBlackHoleAngelus'],
+    'Snow Globe Huges': ['HugeSnowGlobeHamster', 'HugeRainbowSnowGlobeHamster', 'HugeSnowGlobeCat', 'HugeRainbowSnowGlobeCat'],
+    'Ice Cube Huges': ['HugeIceCubeGingerbreadCorgi', 'HugeRainbowIceCubeGingerbreadCorgi', 'HugeIceCubeCookieCutCat', 'HugeRainbowIceCubeCookieCutCat'],
+    'Jelly Huges': ['HugeJellyDragon', 'HugeRainbowJellyDragon', 'HugeJellyKitsune', 'HugeRainbowJellyKitsune'],
+    'Blazing Huges': ['HugeBlazingShark', 'HugeRainbowBlazingShark', 'HugeBlazingBat', 'HugeRainbowBlazingBat'],
+    'Event Huges': ['HugePartyCat', 'HugeGoldenPartyCat', 'HugeRainbowPartyCat', 'HugePartyDragon', 'HugeGoldenPartyDragon', 'HugeRainbowPartyDragon', 'HugeHellRock', 'HugeGoldenHellRock', 'HugeRainbowHellRock'],
+    'Christmas.1 Huges': ['HugePresentChestMimic', 'HugeRainbowPresentChestMimic', 'HugeGingerbreadAngelus', 'HugeGoldenGingerbreadAngelus', 'HugeRainbowGingerbreadAngelus', 'HugeNorthPoleWolf', 'HugeGoldenNorthPoleWolf', 'HugeRainbowNorthPoleWolf'],
     'Christmas.2 Huges': ['HugeIcyPhoenix', 'HugeGoldenIcyPhoenix', 'HugeRainbowIcyPhoenix'],
-    'Map Huges': ['HugeChestMimic', 'HugeGoldenChestMimic', 'HugeRainbowChestMimic', 'HugeSorcererCat', 'HugeGoldenSorcererCat', 'HugeRainbowSorcererCat', 'HugePropellerCat', 'HugeGoldenPropellerCat', 'HugeRainbowPropellerCat', 'HugeDominusAzureus', 'HugeGoldenDominusAzureus', 'HugeRainbowDominusAzureus', 'HugePropellerDog', 'HugeGoldenPropellerDog', 'HugeRainbowPropellerDog']
+    'Map Huges': ['HugeChestMimic', 'HugeGoldenChestMimic', 'HugeRainbowChestMimic', 'HugeSorcererCat', 'HugeGoldenSorcererCat', 'HugeRainbowSorcererCat', 'HugeDominusAzureus', 'HugeGoldenDominusAzureus', 'HugeRainbowDominusAzureus','HugePropellerCat', 'HugeGoldenPropellerCat', 'HugeRainbowPropellerCat', 'HugePropellerDog', 'HugeGoldenPropellerDog', 'HugeRainbowPropellerDog', 'HugeNinjaCat', 'HugeGoldenNinjaCat', 'HugeRainbowNinjaCat', 'HugeFantasyChestMimic', 'HugeGoldenFantasyChestMimic']
   },
   exclusives: ['BlazingShark', 'BlazingGoldenShark', 'BlazingRainbowShark', 'BlazingBat', 'BlazingGoldenBat', 'BlazingRainbowBat', 'BlazingCorgi', 'BlazingGoldenCorgi', 'BlazingRainbowCorgi', 'IceCubeGingerbreadCat', 'IceCubeGoldenGingerbreadCat', 'IceCubeRainbowGingerbreadCat', 'IceCubeGingerbreadCorgi', 'IceCubeGoldenGingerbreadCorgi', 'IceCubeRainbowGingerbreadCorgi', 'IceCubeCookieCuteCat', 'IceCubeGoldenCookieCuteCat', 'IceCubeRainbowCookieCuteCat', 'SnowGlobeCat', 'SnowGlobeGoldenCat', 'SnowGlobeRainbowCat', 'SnowGlobeAxolotl', 'SnowGlobeGoldenAxolotl', 'SnowGlobeRainbowAxolotl', 'SnowGlobeHamster', 'SnowGlobeGoldenHamster', 'SnowGlobeRainbowHamster', 'JellyCat', 'JellyGoldenCat', 'JellyRainbowCat', 'JellyBunny', 'JellyGoldenBunny', 'JellyRainbowBunny', 'JellyCorgi', 'JellyGoldenCorgi', 'JellyRainbowCorgi', 'BlackHoleAxolotl', 'BlackHoleGoldenAxolotl', 'BlackHoleRainbowAxolotl', 'BlackHoleImmortuus', 'BlackHoleGoldenImmortuus', 'BlackHoleRainbowImmortuus', 'BlackHoleKitsune', 'BlackHoleGoldenKitsune', 'BlackHoleRainbowKitsune'],
   eggs: ['HypeEgg', 'BlazingEgg', 'IceCubeEgg', 'SnowGlobeEgg', 'JellyEgg', 'BlackHoleEgg'],
@@ -56,22 +57,66 @@ const giveawayItemCategories = {
 
 // Item emojis mapping - customize with your server emojis
 const itemEmojis = {
-  'HugeBlackHoleAngelus': '<:HugeBlackHoleAngelus:1461512580970618881>',
-  'HugeGoldenBlackHoleAngelus': '<:HugeGoldenBlackHoleAngelus:1461512580970618881>',
-  'HugeRainbowBlackHoleAngelus': '<:HugeRainbowBlackHoleAngelus:1461512580970618881>',
+  //Huges
+  'HugeBlackHoleAngelus': '<:HugeBlackHoleAngelus:1461868865758695646>',
+  //'HugeRainbowBlackHoleAngelus': '<:HugeRainbowBlackHoleAngelus:0000000000000000000>',
   'HugeSnowGlobeHamster': '<:HugeSnowGlobeHamster:1461512580970618881>',
-  'HugeGoldenSnowGlobeHamster': '<:HugeGoldenSnowGlobeHamster:1461512580970618881>',
-  'HugeRainbowSnowGlobeHamster': '<:HugeRainbowSnowGlobeHamster:1461512580970618881>',
-  'HugeSnowGlobeCat': '<:HugeSnowGlobeCat:1461512580970618881>',
-  'HugeGoldenSnowGlobeCat': '<:HugeGoldenSnowGlobeCat:1461512580970618881>',
-  'HugeRainbowSnowGlobeCat': '<:HugeRainbowSnowGlobeCat:1461512580970618881>',
-  'HugeIceCubeGingerbreadCorgi': '<:HugeIceCubeGingerbreadCorgi:1461512580970618881>',
-  'HugeGoldenIceCubeGingerbreadCorgi': '<:HugeGoldenIceCubeGingerbreadCorgi:1461512580970618881>',
-  'HugeRainbowIceCubeGingerbreadCorgi': '<:HugeRainbowIceCubeGingerbreadCorgi:1461512580970618881>',
-  'HugeIceCubeCookieCutCat': '<:HugeIceCubeCookieCutCat:1461512580970618881>',
-  'HugeGoldenIceCubeCookieCutCat': '<:HugeGoldenIceCubeCookieCutCat:1461512580970618881>',
-  'HugeRainbowIceCubeCookieCutCat': '<:HugeRainbowIceCubeCookieCutCat:1461512580970618881>',
-  // Add more emojis as needed - format: 'ItemName': '<:ItemName:ID>'
+  //'HugeRainbowSnowGlobeHamster': '<:HugeRainbowSnowGlobeHamster:0000000000000000000>',
+  'HugeSnowGlobeCat': '<:HugeSnowGlobeCat:1462107033728975075>',
+  //'HugeRainbowSnowGlobeCat': '<:HugeRainbowSnowGlobeCat:0000000000000000000>',
+  'HugeIceCubeGingerbreadCorgi': '<:HugeIceCubeGingerbreadCorgi:1462106451693535325>',
+  //'HugeRainbowIceCubeGingerbreadCorgi': '<:HugeRainbowIceCubeGingerbreadCorgi:0000000000000000000>',
+  'HugeIceCubeCookieCutCat': '<:HugeIceCubeCookieCutCat:1462116814019493929>',
+  //'HugeRainbowIceCubeCookieCutCat': '<:HugeRainbowIceCubeCookieCutCat:0000000000000000000>',
+  'HugeJellyDragon': '<:HugeJellyDragon:1462106322916081664>',
+  //'HugeRainbowJellyDragon': '<:HugeRainbowJellyDragon:0000000000000000000>',
+  'HugeJellyKitsune': '<:HugeJellyKitsune:1462106866120397087>',
+  //'HugeRainbowJellyKitsune': '<:HugeRainbowJellyKitsune:0000000000000000000>',
+  'HugeBlazingShark': '<:HugeBlazingShark:1462106957703024752>',
+  //'HugeRainbowBlazingShark': '<:HugeRainbowBlazingShark:0000000000000000000>',
+  'HugeBlazingBat': '<:HugeBlazingBat:1462106694598266981>',
+  //'HugeRainbowBlazingBat': '<:HugeRainbowBlazingBat:0000000000000000000>',
+  'HugePartyCat': '<:HugePartyCat:1462106369648889866>',
+  'HugeGoldenPartyCat': '<:HugeGoldenPartyCat:1462114372070543402>',
+  'HugePartyDragon': '<:HugePartyDragon:1462107505734975518>',
+  'HugeGoldenPartyDragon': '<:HugeGoldenPartyDragon:1462107566803779606>',
+  'HugeHellRock': '<:HugeHellRock:1462107622457999381>',
+  'HugeGoldenHellRock': '<:HugeGoldenHellRock:1462106790719258968>',
+  //'HugeRainbowHellRock': '<:HugeRainbowHellRock:0000000000000000000>',
+  'HugeNinjaCat': '<:HugeNinjaCat:1462106737162064016>',
+  'HugeGoldenNinjaCat': '<:HugeGoldenNinjaCat:1462106917483708538>',
+  //'HugeRainbowNinjaCat': '<:HugeRainbowNinjaCat:0000000000000000000>',
+  'HugePresentChestMimic': '<:HugePresentChestMimic:1462107065790107842>',
+  //'HugeRainbowPresentChestMimic': '<:HugeRainbowPresentChestMimic:0000000000000000000>',
+  'HugeGingerbreadAngelus': '<:HugeGingerbreadAngelus:1462107378961875197>',
+  'HugeGoldenGingerbreadAngelus': '<:HugeGoldenGingerbreadAngelus:1462107417327173859>',
+  //'HugeRainbowGingerbreadAngelus': '<:HugeRainbowGingerbreadAngelus:0000000000000000000>',
+  'HugeNorthPoleWolf': '<:HugeNorthPoleWolf:1462107345613095054>',
+  'HugeGoldenNorthPoleWolf': '<:HugeGoldenNorthPoleWolf:1462107307688329319>',
+  'HugeIcyPhoenix': '<:HugeIcyPhoenix:1462107213526077675>',
+  'HugeGoldenIcyPhoenix': '<:HugeGoldenIcyPhoenix:1462107251647975566>',
+  'HugeChestMimic': '<:HugeChestMimic:1462108260604838083>',
+  'HugeGoldenChestMimic': '<:HugeGoldenChestMimic:1462114353871589569>',
+  'HugeSorcererCat': '<:HugeSorcererCat:1462106995283853533>',
+  'HugeGoldenSorcererCat': '<:HugeGoldenSorcererCat:1462114333273100433>',
+  'HugePropellerCat': '<:HugePropellerCat:1462106600620953711>',
+  'HugeGoldenPropellerCat': '<:HugeGoldenPropellerCat:1462114394673643631>',
+  //'HugeRainbowPropellerCat': '<:HugeRainbowPropellerCat:0000000000000000000>',
+  'HugePropellerDog': '<:HugePropellerDog:1462185444837036105>',
+  'HugeGoldenPropellerDog': '<:HugeGoldenPropellerDog:1462185464680157367>',
+  'HugeDominusAzureus': '<:HugeDominusAzureus:1462106645466185833>',
+  'HugeGoldenDominusAzureus': '<:HugeGoldenDominusAzureus:1462114314390343760>',
+  'HugeFantasyChestMimic': '<:HugeFantasyChestMimic:1462166275685093553>',
+  'HugeGoldenFantasyChestMimic': '<:HugeGoldenFantasyChestMimic:1462166252020568096>',
+
+  // Eggs
+  'HypeEgg': '<:HypeEgg:1462107877085806632>',
+  'BlazingEgg': '<:BlazingEgg:1462120052743606344>',
+  'IceCubeEgg': '<:IceCubeEgg:1462108156061683945>',
+  'SnowGlobeEgg': '<:SnowGlobeEgg:1462108029347692741>',
+  'JellyEgg': '<:JellyEgg:1462107816234979338>',
+  'BlackHoleEgg': '<:BlackHoleEgg:1462107779081961483>',
+  //'UnicornEgg': '<:UnicornEgg:0000000000000000000>',
 };
 
 // Helper functions
@@ -275,6 +320,82 @@ client.once('ready', async () => {
 
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
+
+  // Check if user is waiting to upload proof
+  if (message.author.waitingForProof && message.attachments.size > 0) {
+    const proofData = message.author.waitingForProof;
+    const attachment = message.attachments.first();
+
+    // Verify it's an image
+    if (!attachment.contentType || !attachment.contentType.startsWith('image/')) {
+      return message.reply('❌ Please upload an image file.');
+    }
+
+    const guild = message.guild;
+    let proofChannel = null;
+    let proofEmbed = null;
+
+    if (proofData.type === 'trade') {
+      const tradeProofChannelId = '1461849745566990487';
+      proofChannel = guild.channels.cache.get(tradeProofChannelId);
+
+      if (!proofChannel) {
+        delete message.author.waitingForProof;
+        return message.reply('❌ Trade proof channel not found.');
+      }
+
+      // Get trade info
+      const trade = trades.get(proofData.tradeMessageId);
+      if (!trade) {
+        delete message.author.waitingForProof;
+        return message.reply('❌ Trade no longer exists.');
+      }
+
+      // Create proof embed
+      proofEmbed = new EmbedBuilder()
+        .setTitle('🔄 Trade Proof')
+        .setDescription(`**Trade ID:** ${proofData.tradeMessageId}\n**Host:** ${trade.host}\n**Guest:** ${trade.acceptedUser}\n\n**Note:** ${proofData.description || 'No description provided'}`)
+        .setColor(0x0099ff)
+        .setImage(attachment.url)
+        .setFooter({ text: `Submitted by ${message.author.username}` })
+        .setTimestamp();
+    } else if (proofData.type === 'auction') {
+      const auctionProofChannelId = '1461849894615646309';
+      proofChannel = guild.channels.cache.get(auctionProofChannelId);
+
+      if (!proofChannel) {
+        delete message.author.waitingForProof;
+        return message.reply('❌ Auction proof channel not found.');
+      }
+
+      // Get auction info from finishedAuctions Map
+      const auctionData = finishedAuctions.get(proofData.auctionProofMessageId);
+      
+      if (!auctionData) {
+        delete message.author.waitingForProof;
+        return message.reply('❌ Auction no longer exists.');
+      }
+
+      // Create proof embed for auction
+      proofEmbed = new EmbedBuilder()
+        .setTitle('🎪 Auction Proof')
+        .setDescription(`**Title:** ${auctionData.title}\n**Host:** ${auctionData.host}\n**Winner:** ${auctionData.winner}\n**Bid:** ${auctionData.diamonds} 💎\n\n**Note:** ${proofData.description || 'No description provided'}`)
+        .setColor(0x00ff00)
+        .setImage(attachment.url)
+        .setFooter({ text: `Submitted by ${message.author.username}` })
+        .setTimestamp();
+    } else {
+      delete message.author.waitingForProof;
+      return message.reply('❌ Invalid proof type.');
+    }
+
+    // Send to proof channel
+    await proofChannel.send({ embeds: [proofEmbed] });
+    
+    message.reply('✅ Proof image has been submitted and recorded!');
+    delete message.author.waitingForProof;
+    return;
+  }
 
   const auction = Array.from(auctions.values()).find(a => a.channelId === message.channel.id);
   if (!auction) return;
@@ -1326,6 +1447,53 @@ client.on('interactionCreate', async (interaction) => {
 
       trades.delete(tradeMessageId);
       await interaction.reply({ content: 'Trade deleted!', ephemeral: true });
+    }
+
+    if (interaction.customId.startsWith('upload_proof_trade_')) {
+      const messageId = interaction.customId.replace('upload_proof_trade_', '');
+      const trade = trades.get(messageId);
+      if (!trade) return interaction.reply({ content: 'Trade not found.', ephemeral: true });
+
+      // Check if user is host or accepted user
+      if (trade.host.id !== interaction.user.id && trade.acceptedUser.id !== interaction.user.id) {
+        return interaction.reply({ content: 'Only the host or guest can upload proof.', ephemeral: true });
+      }
+
+      // Show modal for image description
+      const modal = new ModalBuilder()
+        .setCustomId(`proof_image_modal_trade_${messageId}`)
+        .setTitle('Upload Proof Image');
+
+      const descriptionInput = new TextInputBuilder()
+        .setCustomId('proof_description')
+        .setLabel('Description (optional)')
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder('Add any notes about this trade...')
+        .setRequired(false);
+
+      const row = new ActionRowBuilder().addComponents(descriptionInput);
+      modal.addComponents(row);
+
+      await interaction.showModal(modal);
+    }
+
+    if (interaction.customId.startsWith('upload_proof_auction_')) {
+      // Show modal for image description
+      const modal = new ModalBuilder()
+        .setCustomId('proof_image_modal_auction')
+        .setTitle('Upload Proof Image');
+
+      const descriptionInput = new TextInputBuilder()
+        .setCustomId('proof_description')
+        .setLabel('Description (optional)')
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder('Add any notes about this auction...')
+        .setRequired(false);
+
+      const row = new ActionRowBuilder().addComponents(descriptionInput);
+      modal.addComponents(row);
+
+      await interaction.showModal(modal);
     }
 
     if (interaction.customId === 'inventory_update_button') {
@@ -2902,6 +3070,53 @@ client.on('interactionCreate', async (interaction) => {
         }
       }, 1000);
     }
+
+    if (interaction.customId.startsWith('proof_image_modal_trade_')) {
+      const messageId = interaction.customId.replace('proof_image_modal_trade_', '');
+      const description = interaction.fields.getTextInputValue('proof_description') || '';
+      const trade = trades.get(messageId);
+
+      if (!trade) return interaction.reply({ content: 'Trade not found.', ephemeral: true });
+
+      // Check if user has attachments
+      if (interaction.message && interaction.message.attachments.size > 0) {
+        // User needs to upload image via button with attachments
+        return interaction.reply({ 
+          content: '❌ Please use the file upload feature. Reply to this message with an image attachment.',
+          ephemeral: true 
+        });
+      }
+
+      // For now, show instruction
+      await interaction.reply({
+        content: '📸 Please attach the proof image to your next message in this channel.\n\nAfter you send the image, the proof will be automatically forwarded to the records channel.',
+        ephemeral: false
+      });
+
+      // Store waiting state
+      interaction.user.waitingForProof = {
+        tradeMessageId: messageId,
+        description: description,
+        type: 'trade'
+      };
+    }
+
+    if (interaction.customId === 'proof_image_modal_auction') {
+      const description = interaction.fields.getTextInputValue('proof_description') || '';
+
+      // Show instruction
+      await interaction.reply({
+        content: '📸 Please attach the proof image to your next message in this channel.\n\nAfter you send the image, the proof will be automatically forwarded to the records channel.',
+        ephemeral: false
+      });
+
+      // Store waiting state
+      interaction.user.waitingForProof = {
+        auctionProofMessageId: interaction.message?.id || null,
+        description: description,
+        type: 'auction'
+      };
+    }
   }
 });
 
@@ -2975,6 +3190,19 @@ async function updateTradeEmbed(guild, trade, messageId) {
         .setStyle(ButtonStyle.Danger);
 
       components.push(new ActionRowBuilder().addComponents(acceptButton, declineButton));
+    } else if (trade.accepted) {
+      // Add Upload Proof Image button for accepted trades
+      const proofButton = new ButtonBuilder()
+        .setCustomId(`upload_proof_trade_${messageId}`)
+        .setLabel('Upload Proof Image')
+        .setStyle(ButtonStyle.Primary);
+
+      const deleteButton = new ButtonBuilder()
+        .setCustomId(`trade_delete_${Date.now()}`)
+        .setLabel('Delete')
+        .setStyle(ButtonStyle.Danger);
+
+      components.push(new ActionRowBuilder().addComponents(proofButton, deleteButton));
     } else if (!trade.accepted) {
       const offerButton = new ButtonBuilder()
         .setCustomId('trade_offer_button')
@@ -3014,9 +3242,29 @@ async function endAuction(channel) {
   const embed = new EmbedBuilder()
     .setTitle('Auction Ended!')
     .setDescription(`**Title:** ${auction.title}\n**Winner:** ${winner.user}\n**Bid:** ${winner.diamonds} 💎${winner.items ? ` and ${winner.items}` : ''}`)
-    .setColor(0xff0000);
+    .setColor(0xff0000)
+    .setFooter({ text: 'Version 1.0.9 | Made By Atlas' });
 
-  channel.send({ embeds: [embed] });
+  // Add Upload Proof Image button
+  const proofButton = new ButtonBuilder()
+    .setCustomId(`upload_proof_auction_${channel.id}`)
+    .setLabel('Upload Proof Image')
+    .setStyle(ButtonStyle.Primary);
+
+  const row = new ActionRowBuilder().addComponents(proofButton);
+
+  const proofMessage = await channel.send({ embeds: [embed], components: [row] });
+
+  // Store finished auction data for proof handler
+  finishedAuctions.set(proofMessage.id, {
+    host: auction.host,
+    title: auction.title,
+    winner: winner.user,
+    diamonds: winner.diamonds,
+    items: winner.items,
+    channelId: channel.id,
+    auctionChannelId: '1461849894615646309'
+  });
 }
 
 client.login(process.env.TOKEN || config.token);
