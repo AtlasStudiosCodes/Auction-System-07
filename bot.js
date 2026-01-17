@@ -3,6 +3,145 @@ global.ReadableStream = ReadableStream;
 
 const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, ApplicationCommandOptionType } = require('discord.js');
 const config = require('./config.json');
+const fs = require('fs');
+const path = require('path');
+
+// Versioning system
+const versionFile = path.join(__dirname, 'version.json');
+const dataFile = path.join(__dirname, 'data.json');
+
+let versions = {
+  auction: '1.1.2',
+  trade: '1.1.3',
+  inventory: '1.1.0',
+  bid: '1.1.2'
+};
+
+// Load versions from file
+try {
+  if (fs.existsSync(versionFile)) {
+    versions = JSON.parse(fs.readFileSync(versionFile, 'utf8'));
+  }
+} catch (e) {
+  console.error('Error loading versions:', e);
+}
+
+// Data persistence functions
+function saveData() {
+  try {
+    const data = {
+      auctions: Array.from(auctions.entries()).map(([key, value]) => ({
+        channelId: key,
+        ...value,
+        host: value.host ? { id: value.host.id, username: value.host.username } : null,
+        bids: value.bids ? value.bids.map(b => ({
+          user: { id: b.user.id, username: b.user.username },
+          diamonds: b.diamonds,
+          items: b.items,
+          timestamp: b.timestamp
+        })) : []
+      })),
+      trades: Array.from(trades.entries()).map(([key, value]) => ({
+        messageId: key,
+        ...value,
+        host: value.host ? { id: value.host.id, username: value.host.username } : null,
+        acceptedUser: value.acceptedUser ? { id: value.acceptedUser.id, username: value.acceptedUser.username } : null,
+        offers: value.offers ? value.offers.map(o => ({
+          user: { id: o.user.id, username: o.user.username },
+          diamonds: o.diamonds,
+          items: o.items,
+          timestamp: o.timestamp
+        })) : []
+      })),
+      inventories: Array.from(inventories.entries()).map(([key, value]) => ({
+        userId: key,
+        ...value
+      })),
+      userTradeCount: Object.fromEntries(userTradeCount),
+      lastSaved: new Date().toISOString()
+    };
+    fs.writeFileSync(dataFile, JSON.stringify(data, null, 2));
+    console.log('✓ Data saved successfully');
+  } catch (e) {
+    console.error('Error saving data:', e);
+  }
+}
+
+function loadData() {
+  try {
+    if (!fs.existsSync(dataFile)) {
+      console.log('No previous data found');
+      return;
+    }
+    const data = JSON.parse(fs.readFileSync(dataFile, 'utf8'));
+    console.log('Loading previous data...');
+    
+    // Note: User objects won't be fully reconstructed until Discord provides them
+    // We'll store the data and reconstruct when needed
+    if (data.auctions && Array.isArray(data.auctions)) {
+      data.auctions.forEach(auction => {
+        // Store for later reconstruction when bot has guild access
+        auctions.set(auction.channelId, {
+          ...auction,
+          host: auction.host || null,
+          bids: auction.bids || [],
+          timer: null,
+          updateInterval: null
+        });
+      });
+      console.log(`✓ Loaded ${data.auctions.length} auctions`);
+    }
+    
+    if (data.trades && Array.isArray(data.trades)) {
+      data.trades.forEach(trade => {
+        trades.set(trade.messageId, {
+          ...trade,
+          host: trade.host || null,
+          acceptedUser: trade.acceptedUser || null,
+          offers: trade.offers || [],
+          notificationMessages: trade.notificationMessages || []
+        });
+      });
+      console.log(`✓ Loaded ${data.trades.length} trades`);
+    }
+    
+    if (data.inventories && Array.isArray(data.inventories)) {
+      data.inventories.forEach(inv => {
+        inventories.set(inv.userId, inv);
+      });
+      console.log(`✓ Loaded ${data.inventories.length} inventories`);
+    }
+    
+    if (data.userTradeCount && typeof data.userTradeCount === 'object') {
+      Object.entries(data.userTradeCount).forEach(([userId, count]) => {
+        userTradeCount.set(userId, count);
+      });
+    }
+  } catch (e) {
+    console.error('Error loading data:', e);
+  }
+}
+
+function updateVersion(system) {
+  const versionParts = versions[system].split('.').map(Number);
+  versionParts[2] = (versionParts[2] || 0) + 1;
+  versions[system] = versionParts.join('.');
+  
+  try {
+    const versionData = {
+      ...versions,
+      lastUpdated: new Date().toISOString()
+    };
+    fs.writeFileSync(versionFile, JSON.stringify(versionData, null, 2));
+    console.log(`✓ ${system} version updated to ${versions[system]}`);
+  } catch (e) {
+    console.error('Error updating version:', e);
+  }
+}
+
+function getVersion(system) {
+  return versions[system] || '1.0.0';
+}
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
 
@@ -48,9 +187,9 @@ const hugeImages = {
   
   // Snow Globe Huges
   'HugeSnowGlobeHamster': '<:HugeSnowGlobeHamster:1462106218356281374>',
-  //'HugeRainbowSnowGlobeHamster':'<:HugeRainbowSnowGlobeHamster:00000000000000000>',
+  'HugeRainbowSnowGlobeHamster':'<:HugeRainbowSnowGlobeHamster:00000000000000000>',
   'HugeSnowGlobeCat': '<:HugeSnowGlobeCat:1462107033728975075>',
-  //'HugeRainbowSnowGlobeCat': '<:HugeRainbowSnowGlobeCat:00000000000000000>',
+  'HugeRainbowSnowGlobeCat': '<:HugeRainbowSnowGlobeCat:00000000000000000>',
   
   // Ice Cube Huges
   'HugeIceCubeGingerbreadCorgi': '<:HugeIceCubeGingerbreadCorgi:1462106451693535325>',
@@ -179,8 +318,16 @@ const hugeImages = {
   'CasteLootbox': '<:SpintheWheellootbox:1462120075762077716>'
 };
 
-client.once('ready', async () => {
+client.once('clientReady', async () => {
   console.log('Auction Bot is ready!');
+  
+  // Load previous data
+  loadData();
+  
+  // Set up periodic data saving (every 5 minutes)
+  setInterval(() => {
+    saveData();
+  }, 5 * 60 * 1000);
 
   // Register slash commands
   const commands = [
@@ -460,13 +607,13 @@ client.on('interactionCreate', async (interaction) => {
     if (commandName === 'setup') {
       const adminRoles = ['1461505505401896972', '1461481291118678087', '1461484563183435817'];
       const hasAdminRole = interaction.member.roles.cache.some(role => adminRoles.includes(role.id));
-      if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+      if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', flags: 64 });
 
       const embed = new EmbedBuilder()
         .setTitle('Auction System Setup')
         .setDescription('Welcome to the live auction system!\n\n**How it works:**\n- Auctions are held per channel to avoid conflicts.\n- Bidding can be done via text (e.g., "bid 10000") or slash commands.\n- The auction ends automatically after the set time, or can be ended early.\n- Winner is the highest bidder (diamonds first, then first bid if tie).\n\nClick the button below to create a new auction.')
         .setColor(0x00ff00)
-        .setFooter({ text: 'Version 1.1.2 | Made By Atlas' })
+        .setFooter({ text: `Version ${getVersion('auction')} | Made By Atlas` })
         .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
       const row = new ActionRowBuilder()
@@ -482,7 +629,7 @@ client.on('interactionCreate', async (interaction) => {
 
     if (commandName === 'bid') {
       const auction = Array.from(auctions.values()).find(a => a.channelId === interaction.channel.id);
-      if (!auction) return interaction.reply({ content: 'No auction running in this channel.', ephemeral: true });
+      if (!auction) return interaction.reply({ content: 'No auction running in this channel.', flags: 64 });
 
       // Show modal
       const modal = new ModalBuilder()
@@ -513,34 +660,34 @@ client.on('interactionCreate', async (interaction) => {
 
     if (commandName === 'endauction') {
       const auction = Array.from(auctions.values()).find(a => a.channelId === interaction.channel.id);
-      if (!auction) return interaction.reply({ content: 'No auction running.', ephemeral: true });
-      if (auction.host.id !== interaction.user.id) return interaction.reply({ content: 'Only the host can end the auction.', ephemeral: true });
+      if (!auction) return interaction.reply({ content: 'No auction running.', flags: 64 });
+      if (auction.host.id !== interaction.user.id) return interaction.reply({ content: 'Only the host can end the auction.', flags: 64 });
 
       clearTimeout(auction.timer);
       await endAuction(interaction.channel);
-      interaction.reply('Auction ended by host.');
+      await interaction.reply('Auction ended by host.');
     }
 
     if (commandName === 'auctionstatus') {
       const auction = Array.from(auctions.values()).find(a => a.channelId === interaction.channel.id);
-      if (!auction) return interaction.reply({ content: 'No auction running.', ephemeral: true });
+      if (!auction) return interaction.reply({ content: 'No auction running.', flags: 64 });
 
       const embed = new EmbedBuilder()
         .setTitle('Auction Status')
         .setDescription(`Title: ${auction.title}\nDescription: ${auction.description}\nModel: ${auction.model}\nStarting Price: ${formatBid(auction.startingPrice)} 💎\nTime Left: ${Math.max(0, auction.time - Math.floor((Date.now() - auction.started) / 1000))} seconds\nBids: ${auction.bids.length}`)
         .setColor(0x0000ff);
 
-      interaction.reply({ embeds: [embed], ephemeral: true });
+      await interaction.reply({ embeds: [embed], flags: 64 });
     }
 
     const adminRoles = ['1461505505401896972', '1461481291118678087', '1461484563183435817'];
     const hasAdminRole = interaction.member.roles.cache.some(role => adminRoles.includes(role.id));
 
     if (commandName === 'deleteauction') {
-      if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+      if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', flags: 64 });
       const messageId = interaction.options.getString('messageid');
       const auction = Array.from(auctions.values()).find(a => a.messageId === messageId);
-      if (!auction) return interaction.reply({ content: 'Auction not found.', ephemeral: true });
+      if (!auction) return interaction.reply({ content: 'Auction not found.', flags: 64 });
 
       clearTimeout(auction.timer);
       clearInterval(auction.updateInterval);
@@ -553,37 +700,37 @@ client.on('interactionCreate', async (interaction) => {
         // ignore if message not found
       }
       auctions.delete(auction.channelId);
-      interaction.reply({ content: `Auction "${auction.title}" (from ${auction.host}) deleted by admin.`, ephemeral: true });
+      await interaction.reply({ content: `Auction "${auction.title}" (from ${auction.host}) deleted by admin.`, flags: 64 });
     }
 
     if (commandName === 'endauctionadmin') {
-      if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+      if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', flags: 64 });
       const messageId = interaction.options.getString('messageid');
       const auction = Array.from(auctions.values()).find(a => a.messageId === messageId);
-      if (!auction) return interaction.reply({ content: 'Auction not found.', ephemeral: true });
+      if (!auction) return interaction.reply({ content: 'Auction not found.', flags: 64 });
 
       clearTimeout(auction.timer);
       clearInterval(auction.updateInterval);
       const channel = interaction.guild.channels.cache.get(auction.channelId);
       await endAuction(channel);
-      interaction.reply({ content: `Auction "${auction.title}" (from ${auction.host}) ended by admin.`, ephemeral: true });
+      await interaction.reply({ content: `Auction "${auction.title}" (from ${auction.host}) ended by admin.`, flags: 64 });
     }
 
     if (commandName === 'endchanneladmin') {
-      if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+      if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', flags: 64 });
       const auction = Array.from(auctions.values()).find(a => a.channelId === interaction.channel.id);
-      if (!auction) return interaction.reply({ content: 'No auction running in this channel.', ephemeral: true });
+      if (!auction) return interaction.reply({ content: 'No auction running in this channel.', flags: 64 });
 
       clearTimeout(auction.timer);
       clearInterval(auction.updateInterval);
       await endAuction(interaction.channel);
-      interaction.reply({ content: `Auction "${auction.title}" (from ${auction.host}) ended by admin.`, ephemeral: true });
+      await interaction.reply({ content: `Auction "${auction.title}" (from ${auction.host}) ended by admin.`, flags: 64 });
     }
 
     if (commandName === 'deletechanneladmin') {
-      if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+      if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', flags: 64 });
       const auction = Array.from(auctions.values()).find(a => a.channelId === interaction.channel.id);
-      if (!auction) return interaction.reply({ content: 'No auction running in this channel.', ephemeral: true });
+      if (!auction) return interaction.reply({ content: 'No auction running in this channel.', flags: 64 });
 
       clearTimeout(auction.timer);
       clearInterval(auction.updateInterval);
@@ -595,14 +742,14 @@ client.on('interactionCreate', async (interaction) => {
         // ignore if message not found
       }
       auctions.delete(interaction.channel.id);
-      interaction.reply({ content: `Auction "${auction.title}" (from ${auction.host}) deleted by admin.`, ephemeral: true });
+      await interaction.reply({ content: `Auction "${auction.title}" (from ${auction.host}) deleted by admin.`, flags: 64 });
     }
 
     if (commandName === 'restartauction') {
-      if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+      if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', flags: 64 });
       const messageId = interaction.options.getString('messageid');
       const auction = Array.from(auctions.values()).find(a => a.messageId === messageId);
-      if (!auction) return interaction.reply({ content: 'Auction not found.', ephemeral: true });
+      if (!auction) return interaction.reply({ content: 'Auction not found.', flags: 64 });
 
       clearTimeout(auction.timer);
       clearInterval(auction.updateInterval);
@@ -623,7 +770,7 @@ client.on('interactionCreate', async (interaction) => {
           .setTitle(auction.title)
           .setDescription(`${auction.description}\n\n**Looking For:** ${auction.model}\n**Starting Price:** ${formatBid(auction.startingPrice)} 💎\n**Current Bid:** ${formatBid(currentBid)} 💎\n**Time Remaining:** ${remaining}s\n**Hosted by:** ${auction.host}`)
           .setColor(0x00ff00)
-          .setFooter({ text: 'Version 1.1.2 | Made By Atlas' })
+          .setFooter({ text: `Version ${getVersion('auction')} | Made By Atlas` })
           .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
         try {
           const channel = interaction.guild.channels.cache.get(auction.channelId);
@@ -636,31 +783,31 @@ client.on('interactionCreate', async (interaction) => {
           // ignore
         }
       }, 1000);
-      interaction.reply({ content: 'Auction restarted.', ephemeral: true });
+      await interaction.reply({ content: 'Auction restarted.', flags: 64 });
     }
 
     if (commandName === 'redirectauctions') {
-      if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+      if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', flags: 64 });
       const channel = interaction.options.getChannel('channel');
-      if (channel.type !== 0) return interaction.reply({ content: 'Please select a text channel.', ephemeral: true });
+      if (channel.type !== 0) return interaction.reply({ content: 'Please select a text channel.', flags: 64 });
       redirectChannelId = channel.id;
-      interaction.reply({ content: `All future auctions will be redirected to ${channel}.`, ephemeral: true });
+      await interaction.reply({ content: `All future auctions will be redirected to ${channel}.`, flags: 64 });
     }
 
     if (commandName === 'redirecttrade') {
-      if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+      if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', flags: 64 });
       const channel = interaction.options.getChannel('channel');
-      if (channel.type !== 0) return interaction.reply({ content: 'Please select a text channel.', ephemeral: true });
+      if (channel.type !== 0) return interaction.reply({ content: 'Please select a text channel.', flags: 64 });
       redirectTradeChannelId = channel.id;
-      interaction.reply({ content: `All future trades will be redirected to ${channel}.`, ephemeral: true });
+      await interaction.reply({ content: `All future trades will be redirected to ${channel}.`, flags: 64 });
     }
 
     if (commandName === 'redirectinventory') {
-      if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+      if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', flags: 64 });
       const channel = interaction.options.getChannel('channel');
-      if (channel.type !== 0) return interaction.reply({ content: 'Please select a text channel.', ephemeral: true });
+      if (channel.type !== 0) return interaction.reply({ content: 'Please select a text channel.', flags: 64 });
       redirectInventoryChannelId = channel.id;
-      interaction.reply({ content: `All inventories will be posted to ${channel}.`, ephemeral: true });
+      await interaction.reply({ content: `All inventories will be posted to ${channel}.`, flags: 64 });
     }
 
     if (commandName === 'setuptrade') {
@@ -673,7 +820,7 @@ client.on('interactionCreate', async (interaction) => {
       if (currentTradeCount >= userTradeLimit) {
         return interaction.reply({ 
           content: `You have reached your trade creation limit (${userTradeLimit}). ${isAdmin ? 'As an admin, you can have up to 10 active trades.' : 'Regular users can have up to 2 active trades.'}`,
-          ephemeral: true 
+          flags: 64 
         });
       }
 
@@ -681,7 +828,7 @@ client.on('interactionCreate', async (interaction) => {
         .setTitle('Trade System Setup')
         .setDescription('Welcome to the live trade system!\n\n**How it works:**\n- Create a trade offer with items or diamonds.\n- Other users can place their offers in response.\n- Host can accept or decline offers.\n- Once accepted, both users are notified.\n\nClick the button below to create a new trade.')
         .setColor(0x0099ff)
-        .setFooter({ text: 'Version 1.1.3 | Made By Atlas' })
+        .setFooter({ text: `Version ${getVersion('trade')} | Made By Atlas` })
         .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
       const row = new ActionRowBuilder()
@@ -698,11 +845,11 @@ client.on('interactionCreate', async (interaction) => {
     if (commandName === 'deletetrade') {
       const adminRoles = ['1461505505401896972', '1461481291118678087', '1461484563183435817'];
       const hasAdminRole = interaction.member.roles.cache.some(role => adminRoles.includes(role.id));
-      if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+      if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', flags: 64 });
 
       const messageId = interaction.options.getString('messageid');
       const trade = trades.get(messageId);
-      if (!trade) return interaction.reply({ content: 'Trade not found.', ephemeral: true });
+      if (!trade) return interaction.reply({ content: 'Trade not found.', flags: 64 });
 
       // Decrement trade count for host
       const hostId = trade.host.id;
@@ -721,20 +868,20 @@ client.on('interactionCreate', async (interaction) => {
       }
 
       trades.delete(messageId);
-      interaction.reply({ content: `Trade from ${trade.host} has been deleted.`, ephemeral: true });
+      await interaction.reply({ content: `Trade from ${trade.host} has been deleted.`, flags: 64 });
     }
 
     if (commandName === 'accepttrade') {
       const adminRoles = ['1461505505401896972', '1461481291118678087', '1461484563183435817'];
       const hasAdminRole = interaction.member.roles.cache.some(role => adminRoles.includes(role.id));
-      if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+      if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', flags: 64 });
 
       const messageId = interaction.options.getString('messageid');
       const trade = trades.get(messageId);
-      if (!trade) return interaction.reply({ content: 'Trade not found.', ephemeral: true });
+      if (!trade) return interaction.reply({ content: 'Trade not found.', flags: 64 });
 
       if (trade.offers.length > 0) {
-        return interaction.reply({ content: 'This trade has offers and cannot be cancelled this way.', ephemeral: true });
+        return interaction.reply({ content: 'This trade has offers and cannot be cancelled this way.', flags: 64 });
       }
 
       // Mark trade as cancelled
@@ -748,7 +895,7 @@ client.on('interactionCreate', async (interaction) => {
       const channel = interaction.guild.channels.cache.get(trade.channelId);
       await channel.send(`❌ This trade has been cancelled by an admin.`);
 
-      interaction.reply({ content: `Trade has been cancelled.`, ephemeral: true });
+      await interaction.reply({ content: `Trade has been cancelled.`, flags: 64 });
     }
 
     if (commandName === 'setupinventory') {
@@ -756,7 +903,7 @@ client.on('interactionCreate', async (interaction) => {
         .setTitle('📦 Inventory System Setup')
         .setDescription('Welcome to the inventory system!\n\n**How it works:**\n- Create your personal inventory with items you have in stock.\n- Set your diamond amount and describe what you\'re looking for.\n- Optionally add your Roblox username to display your avatar.\n- Other users can see your inventory and make offers!\n- Update anytime - your previous items stay saved if you don\'t remove them.\n\nClick the button below to create or edit your inventory.')
         .setColor(0x00a8ff)
-        .setFooter({ text: 'Version 1.0.8 | Made By Atlas' })
+        .setFooter({ text: `Version ${getVersion('inventory')} | Made By Atlas` })
         .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
       const row = new ActionRowBuilder()
@@ -774,7 +921,7 @@ client.on('interactionCreate', async (interaction) => {
   if (interaction.isButton()) {
     if (interaction.customId === 'bid_button') {
       const auction = Array.from(auctions.values()).find(a => a.channelId === interaction.channel.id);
-      if (!auction) return interaction.reply({ content: 'No auction running.', ephemeral: true });
+      if (!auction) return interaction.reply({ content: 'No auction running.', flags: 64 });
 
       const modal = new ModalBuilder()
         .setCustomId('bid_modal')
@@ -804,9 +951,9 @@ client.on('interactionCreate', async (interaction) => {
 
     if (interaction.customId === 'view_bids_button') {
       const auction = Array.from(auctions.values()).find(a => a.channelId === interaction.channel.id);
-      if (!auction) return interaction.reply({ content: 'No auction running.', ephemeral: true });
+      if (!auction) return interaction.reply({ content: 'No auction running.', flags: 64 });
 
-      if (auction.bids.length === 0) return interaction.reply({ content: 'No bids yet.', ephemeral: true });
+      if (auction.bids.length === 0) return interaction.reply({ content: 'No bids yet.', flags: 64 });
 
       // Sort bids by diamonds descending
       const sortedBids = auction.bids.sort((a, b) => b.diamonds - a.diamonds);
@@ -824,10 +971,10 @@ client.on('interactionCreate', async (interaction) => {
         .setTitle('Bid List')
         .setDescription(bidList)
         .setColor(0x00ff00)
-        .setFooter({ text: 'Version 1.1.0 | Made By Atlas' })
+        .setFooter({ text: `Version ${getVersion('inventory')} | Made By Atlas` })
         .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
-      interaction.reply({ embeds: [embed], ephemeral: true });
+      await interaction.reply({ embeds: [embed], flags: 64 });
     }
 
     if (interaction.customId === 'create_auction') {
@@ -884,7 +1031,7 @@ client.on('interactionCreate', async (interaction) => {
         ]);
 
       const row = new ActionRowBuilder().addComponents(categorySelect);
-      await interaction.reply({ content: 'Select an item category to add to your trade offer:', components: [row], ephemeral: true });
+      await interaction.reply({ content: 'Select an item category to add to your trade offer:', components: [row], flags: 64 });
     }
 
     if (interaction.customId === 'create_inventory') {
@@ -908,7 +1055,7 @@ client.on('interactionCreate', async (interaction) => {
         ]);
 
       const row = new ActionRowBuilder().addComponents(categorySelect);
-      await interaction.reply({ content: 'Select an item category to add to your inventory:', components: [row], ephemeral: true });
+      await interaction.reply({ content: 'Select an item category to add to your inventory:', components: [row], flags: 64 });
     }
 
     if (interaction.customId === 'trade_offer_button') {
@@ -946,8 +1093,8 @@ client.on('interactionCreate', async (interaction) => {
     if (interaction.customId.startsWith('trade_accept_')) {
       const messageId = interaction.customId.replace('trade_accept_', '');
       const trade = trades.get(messageId);
-      if (!trade) return interaction.reply({ content: 'Trade not found.', ephemeral: true });
-      if (trade.host.id !== interaction.user.id) return interaction.reply({ content: 'Only the host can accept offers.', ephemeral: true });
+      if (!trade) return interaction.reply({ content: 'Trade not found.', flags: 64 });
+      if (trade.host.id !== interaction.user.id) return interaction.reply({ content: 'Only the host can accept offers.', flags: 64 });
 
       // Accept the last offer
       const lastOffer = trade.offers[trade.offers.length - 1];
@@ -974,14 +1121,14 @@ client.on('interactionCreate', async (interaction) => {
         await channel.send(`✅ Trade accepted! ${trade.host} and ${lastOffer.user}, your trade has been accepted.`);
       }
 
-      await interaction.reply({ content: 'Trade accepted!', ephemeral: true });
+      await interaction.reply({ content: 'Trade accepted!', flags: 64 });
     }
 
     if (interaction.customId.startsWith('trade_decline_')) {
       const messageId = interaction.customId.replace('trade_decline_', '');
       const trade = trades.get(messageId);
-      if (!trade) return interaction.reply({ content: 'Trade not found.', ephemeral: true });
-      if (trade.host.id !== interaction.user.id) return interaction.reply({ content: 'Only the host can decline offers.', ephemeral: true });
+      if (!trade) return interaction.reply({ content: 'Trade not found.', flags: 64 });
+      if (trade.host.id !== interaction.user.id) return interaction.reply({ content: 'Only the host can decline offers.', flags: 64 });
 
       // Decline the last offer
       const lastOffer = trade.offers[trade.offers.length - 1];
@@ -1005,7 +1152,7 @@ client.on('interactionCreate', async (interaction) => {
         await channel.send(`❌ Trade offer from ${lastOffer.user} has been declined.`);
       }
 
-      await interaction.reply({ content: 'Offer declined!', ephemeral: true });
+      await interaction.reply({ content: 'Offer declined!', flags: 64 });
     }
 
     if (interaction.customId.startsWith('trade_delete_')) {
@@ -1021,8 +1168,8 @@ client.on('interactionCreate', async (interaction) => {
         }
       }
 
-      if (!trade) return interaction.reply({ content: 'Trade not found.', ephemeral: true });
-      if (trade.host.id !== interaction.user.id) return interaction.reply({ content: 'Only the host can delete this trade.', ephemeral: true });
+      if (!trade) return interaction.reply({ content: 'Trade not found.', flags: 64 });
+      if (trade.host.id !== interaction.user.id) return interaction.reply({ content: 'Only the host can delete this trade.', flags: 64 });
 
       // Delete the trade message
       try {
@@ -1039,7 +1186,7 @@ client.on('interactionCreate', async (interaction) => {
       }
 
       trades.delete(tradeMessageId);
-      await interaction.reply({ content: 'Trade deleted!', ephemeral: true });
+      await interaction.reply({ content: 'Trade deleted!', flags: 64 });
     }
 
     if (interaction.customId.startsWith('auction_delete_final_')) {
@@ -1055,8 +1202,8 @@ client.on('interactionCreate', async (interaction) => {
         }
       }
 
-      if (!auction) return interaction.reply({ content: 'Auction not found.', ephemeral: true });
-      if (auction.host.id !== interaction.user.id) return interaction.reply({ content: 'Only the host can delete this auction.', ephemeral: true });
+      if (!auction) return interaction.reply({ content: 'Auction not found.', flags: 64 });
+      if (auction.host.id !== interaction.user.id) return interaction.reply({ content: 'Only the host can delete this auction.', flags: 64 });
 
       // Delete the auction message
       try {
@@ -1066,7 +1213,7 @@ client.on('interactionCreate', async (interaction) => {
       }
 
       auctions.delete(auctionChannelId);
-      await interaction.reply({ content: 'Auction deleted!', ephemeral: true });
+      await interaction.reply({ content: 'Auction deleted!', flags: 64 });
     }
 
     if (interaction.customId.startsWith('auction_upload_image_')) {
@@ -1080,11 +1227,11 @@ client.on('interactionCreate', async (interaction) => {
         }
       }
 
-      if (!auction) return interaction.reply({ content: 'Auction not found.', ephemeral: true });
+      if (!auction) return interaction.reply({ content: 'Auction not found.', flags: 64 });
       
       // Check if user is the winner
       if (interaction.user.id !== auction.winnerId) {
-        return interaction.reply({ content: `Only the winner (${auction.winnerUser}) can upload an image for this auction.`, ephemeral: true });
+        return interaction.reply({ content: `Only the winner (${auction.winnerUser}) can upload an image for this auction.`, flags: 64 });
       }
 
       // Show file upload dialog
@@ -1107,11 +1254,11 @@ client.on('interactionCreate', async (interaction) => {
 
     if (interaction.customId.startsWith('trade_upload_image_')) {
       const trade = trades.get(interaction.message.id);
-      if (!trade) return interaction.reply({ content: 'Trade not found.', ephemeral: true });
+      if (!trade) return interaction.reply({ content: 'Trade not found.', flags: 64 });
 
       // Check if user is the host or the accepted guest
       if (interaction.user.id !== trade.host.id && interaction.user.id !== trade.acceptedUser.id) {
-        return interaction.reply({ content: `Only the host (${trade.host}) or guest (${trade.acceptedUser}) can upload an image for this trade.`, ephemeral: true });
+        return interaction.reply({ content: `Only the host (${trade.host}) or guest (${trade.acceptedUser}) can upload an image for this trade.`, flags: 64 });
       }
 
       // Show file upload dialog
@@ -1153,14 +1300,14 @@ client.on('interactionCreate', async (interaction) => {
         ]);
 
       const row = new ActionRowBuilder().addComponents(categorySelect);
-      await interaction.reply({ content: 'Select an item category to add to your inventory:', components: [row], ephemeral: true });
+      await interaction.reply({ content: 'Select an item category to add to your inventory:', components: [row], flags: 64 });
     }
 
     if (interaction.customId === 'inventory_remove_button') {
       // Load previous inventory items
       const previousInventory = inventories.get(interaction.user.id);
       if (!previousInventory || previousInventory.items.length === 0) {
-        return interaction.reply({ content: 'Your inventory is empty. Nothing to remove.', ephemeral: true });
+        return interaction.reply({ content: 'Your inventory is empty. Nothing to remove.', flags: 64 });
       }
 
       interaction.user.inventoryItems = previousInventory.items;
@@ -1179,7 +1326,7 @@ client.on('interactionCreate', async (interaction) => {
         ]);
 
       const row = new ActionRowBuilder().addComponents(categorySelect);
-      await interaction.reply({ content: 'Select an item category to remove from your inventory:', components: [row], ephemeral: true });
+      await interaction.reply({ content: 'Select an item category to remove from your inventory:', components: [row], flags: 64 });
     }
   }
 
@@ -1197,7 +1344,7 @@ client.on('interactionCreate', async (interaction) => {
       });
 
       if (itemsInCategory.length === 0) {
-        return interaction.reply({ content: `You have no items from the ${category} category to remove.`, ephemeral: true });
+        return interaction.reply({ content: `You have no items from the ${category} category to remove.`, flags: 64 });
       }
 
       const itemSelect = new StringSelectMenuBuilder()
@@ -1694,17 +1841,17 @@ client.on('interactionCreate', async (interaction) => {
         }
       }
 
-      if (!auction) return interaction.reply({ content: 'Auction not found.', ephemeral: true });
+      if (!auction) return interaction.reply({ content: 'Auction not found.', flags: 64 });
 
       // Check if user is the winner
       if (interaction.user.id !== auction.winnerId) {
-        return interaction.reply({ content: 'Only the winner can upload this image.', ephemeral: true });
+        return interaction.reply({ content: 'Only the winner can upload this image.', flags: 64 });
       }
 
       // Send to auction images channel
       try {
         const imagesChannel = await interaction.guild.channels.fetch(AUCTION_IMAGES_CHANNEL);
-        if (!imagesChannel) return interaction.reply({ content: 'Images channel not found.', ephemeral: true });
+        if (!imagesChannel) return interaction.reply({ content: 'Images channel not found.', flags: 64 });
 
         const embed = new EmbedBuilder()
           .setTitle(`Auction Image - ${auction.title}`)
@@ -1730,10 +1877,10 @@ client.on('interactionCreate', async (interaction) => {
           // Ignore if original message cannot be updated
         }
 
-        await interaction.reply({ content: '✅ Image uploaded successfully!', ephemeral: true });
+        await interaction.reply({ content: '✅ Image uploaded successfully!', flags: 64 });
       } catch (e) {
         console.error('Error uploading auction image:', e);
-        await interaction.reply({ content: 'Failed to upload image. Please try again.', ephemeral: true });
+        await interaction.reply({ content: 'Failed to upload image. Please try again.', flags: 64 });
       }
     }
 
@@ -1743,17 +1890,17 @@ client.on('interactionCreate', async (interaction) => {
 
       // Find the trade
       const trade = trades.get(messageId);
-      if (!trade) return interaction.reply({ content: 'Trade not found.', ephemeral: true });
+      if (!trade) return interaction.reply({ content: 'Trade not found.', flags: 64 });
 
       // Check if user is the host or accepted guest
       if (interaction.user.id !== trade.host.id && interaction.user.id !== trade.acceptedUser.id) {
-        return interaction.reply({ content: 'Only the host or guest can upload this image.', ephemeral: true });
+        return interaction.reply({ content: 'Only the host or guest can upload this image.', flags: 64 });
       }
 
       // Send to trade images channel
       try {
         const imagesChannel = await interaction.guild.channels.fetch(TRADE_IMAGES_CHANNEL);
-        if (!imagesChannel) return interaction.reply({ content: 'Images channel not found.', ephemeral: true });
+        if (!imagesChannel) return interaction.reply({ content: 'Images channel not found.', flags: 64 });
 
         const embed = new EmbedBuilder()
           .setTitle('Trade Image')
@@ -1779,10 +1926,10 @@ client.on('interactionCreate', async (interaction) => {
           // Ignore if original message cannot be updated
         }
 
-        await interaction.reply({ content: '✅ Image uploaded successfully!', ephemeral: true });
+        await interaction.reply({ content: '✅ Image uploaded successfully!', flags: 64 });
       } catch (e) {
         console.error('Error uploading trade image:', e);
-        await interaction.reply({ content: 'Failed to upload image. Please try again.', ephemeral: true });
+        await interaction.reply({ content: 'Failed to upload image. Please try again.', flags: 64 });
       }
     }
 
@@ -1790,7 +1937,7 @@ client.on('interactionCreate', async (interaction) => {
       const diamondsStr = interaction.fields.getTextInputValue('inv_diamonds_amount');
       const diamonds = parseBid(diamondsStr);
 
-      if (diamonds > MAX_DIAMONDS) return interaction.reply({ content: `Maximum diamonds allowed is ${formatBid(MAX_DIAMONDS)} 💎.`, ephemeral: true });
+      if (diamonds > MAX_DIAMONDS) return interaction.reply({ content: `Maximum diamonds allowed is ${formatBid(MAX_DIAMONDS)} 💎.`, flags: 64 });
 
       if (!interaction.user.inventoryItems) {
         interaction.user.inventoryItems = [];
@@ -2004,7 +2151,7 @@ client.on('interactionCreate', async (interaction) => {
         const embed = new EmbedBuilder()
           .setTitle('📦 Inventory')
           .setColor(0x00a8ff)
-          .setFooter({ text: 'Version 1.1.0 | Made By Atlas' })
+          .setFooter({ text: `Version ${getVersion('inventory')} | Made By Atlas` })
           .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
         if (previousInventory.robloxUsername) {
@@ -2061,7 +2208,7 @@ client.on('interactionCreate', async (interaction) => {
       delete interaction.user.selectedRemoveItems;
       delete interaction.user.selectedRemoveCategory;
 
-      await interaction.reply({ content: responseMessage || 'Removal completed.', ephemeral: true });
+      await interaction.reply({ content: responseMessage || 'Removal completed.', flags: 64 });
       return;
     }
 
@@ -2097,7 +2244,7 @@ client.on('interactionCreate', async (interaction) => {
       const embed = new EmbedBuilder()
         .setTitle('📦 Inventory')
         .setColor(0x00a8ff)
-        .setFooter({ text: 'Version 1.1.0 | Made By Atlas' })
+        .setFooter({ text: `Version ${getVersion('inventory')} | Made By Atlas` })
         .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
       if (robloxUsername) {
@@ -2159,6 +2306,9 @@ client.on('interactionCreate', async (interaction) => {
       };
 
       inventories.set(interaction.user.id, inventoryData);
+      
+      // Update version
+      updateVersion('inventory');
 
       await interaction.reply({ content: `Inventory created! Posted to the inventory channel.`, flags: 64 });
       return;
@@ -2186,7 +2336,7 @@ client.on('interactionCreate', async (interaction) => {
         .setTitle('Trade Offer')
         .setDescription(`**Host:** ${interaction.user}\n**Status:** Waiting for offers`)
         .setColor(0x0099ff)
-        .setFooter({ text: 'Version 1.1.3 | Made By Atlas' })
+        .setFooter({ text: `Version ${getVersion('trade')} | Made By Atlas` })
         .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
       // Format host items with quantities
@@ -2234,6 +2384,9 @@ client.on('interactionCreate', async (interaction) => {
       // Increment trade count for user
       const currentCount = userTradeCount.get(interaction.user.id) || 0;
       userTradeCount.set(interaction.user.id, currentCount + 1);
+      
+      // Update version
+      updateVersion('trade');
 
       await interaction.reply({ content: `Trade offer created in ${targetChannel}! ${targetUsername ? `Awaiting response from ${targetUsername}.` : 'Open for all users.'}`, flags: 64 });
       return;
@@ -2337,11 +2490,11 @@ client.on('interactionCreate', async (interaction) => {
 
     if (interaction.customId === 'bid_modal') {
       const auction = Array.from(auctions.values()).find(a => a.channelId === interaction.channel.id);
-      if (!auction) return interaction.reply({ content: 'No auction running.', ephemeral: true });
+      if (!auction) return interaction.reply({ content: 'No auction running.', flags: 64 });
 
       // Check if bidder is the host
       if (interaction.user.id === auction.host.id) {
-        return interaction.reply({ content: 'You cannot bid on your own auction.', ephemeral: true });
+        return interaction.reply({ content: 'You cannot bid on your own auction.', flags: 64 });
       }
 
       const diamondsStr = interaction.fields.getTextInputValue('diamonds');
@@ -2352,19 +2505,23 @@ client.on('interactionCreate', async (interaction) => {
         diamonds = parseBid(diamondsStr);
       }
 
-      if (diamonds > MAX_DIAMONDS) return interaction.reply({ content: `Maximum diamonds allowed is ${formatBid(MAX_DIAMONDS)} 💎.`, ephemeral: true });
+      if (diamonds > MAX_DIAMONDS) return interaction.reply({ content: `Maximum diamonds allowed is ${formatBid(MAX_DIAMONDS)} 💎.`, flags: 64 });
 
-      if (auction.model === 'items' && diamonds > 0) return interaction.reply({ content: 'This auction is offers only.', ephemeral: true });
-      if (auction.model === 'diamonds' && items) return interaction.reply({ content: 'This auction is diamonds only.', ephemeral: true });
-      if (auction.model === 'diamonds' && diamonds === 0) return interaction.reply({ content: 'Please enter diamonds.', ephemeral: true });
-      if (auction.model === 'items' && !items) return interaction.reply({ content: 'Please enter an offer.', ephemeral: true });
+      if (auction.model === 'items' && diamonds > 0) return interaction.reply({ content: 'This auction is offers only.', flags: 64 });
+      if (auction.model === 'diamonds' && items) return interaction.reply({ content: 'This auction is diamonds only.', flags: 64 });
+      if (auction.model === 'diamonds' && diamonds === 0) return interaction.reply({ content: 'Please enter diamonds.', flags: 64 });
+      if (auction.model === 'items' && !items) return interaction.reply({ content: 'Please enter an offer.', flags: 64 });
 
       // Check if bid is higher than current max
       const maxBid = auction.bids.length > 0 ? Math.max(...auction.bids.map(b => b.diamonds)) : auction.startingPrice;
-      if (auction.model !== 'items' && diamonds <= maxBid) return interaction.reply({ content: `Your bid must be higher than the current highest bid of ${maxBid} 💎.`, ephemeral: true });
+      if (auction.model !== 'items' && diamonds <= maxBid) return interaction.reply({ content: `Your bid must be higher than the current highest bid of ${maxBid} 💎.`, flags: 64 });
 
       auction.bids.push({ user: interaction.user, diamonds, items, timestamp: Date.now() });
-      interaction.reply(`Bid placed: ${diamonds > 0 ? `${diamonds} 💎` : ''}${items ? ` and ${items}` : ''}`);
+      
+      // Update version
+      updateVersion('bid');
+      
+      await interaction.reply(`Bid placed: ${diamonds > 0 ? `${diamonds} 💎` : ''}${items ? ` and ${items}` : ''}`);
     }
 
     if (interaction.customId === 'auction_modal') {
@@ -2373,14 +2530,14 @@ client.on('interactionCreate', async (interaction) => {
       const startingPriceStr = interaction.fields.getTextInputValue('starting_price');
       const model = interaction.fields.getTextInputValue('model').toLowerCase();
 
-      if (!['diamonds', 'items', 'both'].includes(model)) return interaction.reply({ content: 'Invalid model. Use diamonds, items/offer, or both.', ephemeral: true });
+      if (!['diamonds', 'items', 'both'].includes(model)) return interaction.reply({ content: 'Invalid model. Use diamonds, items/offer, or both.', flags: 64 });
       const time = 200; // Fixed to 60 for 200 seconds
       const startingPrice = parseBid(startingPriceStr);
-      if (isNaN(startingPrice) || startingPrice < 0) return interaction.reply({ content: 'Invalid starting price.', ephemeral: true });
-      if (startingPrice > MAX_DIAMONDS) return interaction.reply({ content: `Maximum diamonds allowed is ${formatBid(MAX_DIAMONDS)} 💎.`, ephemeral: true });
+      if (isNaN(startingPrice) || startingPrice < 0) return interaction.reply({ content: 'Invalid starting price.', flags: 64 });
+      if (startingPrice > MAX_DIAMONDS) return interaction.reply({ content: `Maximum diamonds allowed is ${formatBid(MAX_DIAMONDS)} 💎.`, flags: 64 });
 
       if (auctions.size > 0) {
-        return interaction.reply({ content: 'An auction is already running in the server. Please wait for it to end.', ephemeral: true });
+        return interaction.reply({ content: 'An auction is already running in the server. Please wait for it to end.', flags: 64 });
       }
 
       const auction = {
@@ -2396,7 +2553,7 @@ client.on('interactionCreate', async (interaction) => {
       };
 
       const targetChannel = redirectChannelId ? interaction.guild.channels.cache.get(redirectChannelId) : interaction.channel;
-      if (!targetChannel) return interaction.reply({ content: 'Redirect channel not found.', ephemeral: true });
+      if (!targetChannel) return interaction.reply({ content: 'Redirect channel not found.', flags: 64 });
 
       // Send ping message first
       const pingMsg = await targetChannel.send('-# ||<@&1461741243427197132>||');
@@ -2406,7 +2563,7 @@ client.on('interactionCreate', async (interaction) => {
         .setTitle(title)
         .setDescription(`${description}\n\n**Looking For:** ${model}\n**Starting Price:** ${formatBid(startingPrice)} 💎\n**Current Bid:** ${formatBid(startingPrice)} 💎\n**Time Remaining:** ${time}s\n**Hosted by:** ${interaction.user}`)
         .setColor(0x00ff00)
-        .setFooter({ text: 'Version 1.1.2 | Made By Atlas' })
+        .setFooter({ text: `Version ${getVersion('auction')} | Made By Atlas` })
         .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
       const row = new ActionRowBuilder()
@@ -2425,8 +2582,11 @@ client.on('interactionCreate', async (interaction) => {
       auction.messageId = message.id;
       auction.channelId = targetChannel.id;
       auctions.set(targetChannel.id, auction);
+      
+      // Update version
+      updateVersion('auction');
 
-      await interaction.reply({ content: `Auction "${title}" started in ${targetChannel}!`, ephemeral: true });
+      await interaction.reply({ content: `Auction "${title}" started in ${targetChannel}!`, flags: 64 });
 
       // Start timer
       auction.timer = setTimeout(async () => {
@@ -2446,7 +2606,7 @@ client.on('interactionCreate', async (interaction) => {
           .setTitle(auction.title)
           .setDescription(`${auction.description}\n\n**Looking For:** ${auction.model}\n**Starting Price:** ${formatBid(auction.startingPrice)} 💎\n**Current Bid:** ${formatBid(currentBid)} 💎\n**Time Remaining:** ${remaining}s\n**Hosted by:** ${auction.host}`)
           .setColor(0x00ff00)
-          .setFooter({ text: 'Version 1.1.2 | Made By Atlas' })
+          .setFooter({ text: `Version ${getVersion('auction')} | Made By Atlas` })
           .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
         try {
           await message.edit({ embeds: [updatedEmbed], components: [row] });
@@ -2472,7 +2632,7 @@ async function updateTradeEmbed(guild, trade, messageId) {
     const embed = new EmbedBuilder()
       .setTitle('Trade Offer')
       .setColor(trade.accepted ? 0x00ff00 : 0x0099ff)
-      .setFooter({ text: 'Version 1.1.3 | Made By Atlas' })
+      .setFooter({ text: `Version ${getVersion('trade')} | Made By Atlas` })
       .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
     if (trade.accepted) {
@@ -2614,5 +2774,20 @@ async function endAuction(channel) {
   auction.winnerUser = winner.user;
   auctions.set(channel.id, auction);
 }
+
+// Save data on graceful shutdown
+process.on('SIGINT', () => {
+  console.log('\n⏹️  Shutting down gracefully...');
+  saveData();
+  client.destroy();
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  console.log('\n⏹️  Shutting down gracefully...');
+  saveData();
+  client.destroy();
+  process.exit(0);
+});
 
 client.login(process.env.TOKEN || config.token);
