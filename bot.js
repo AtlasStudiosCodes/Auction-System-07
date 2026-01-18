@@ -69,7 +69,7 @@ const itemEmojis = {
   'HugeElectricUnicorn': '<:HugeStormAgony:1462294295057793186>',
   'HugeRainbowElectricUnicorn': '📦',
   'HugeStormAgony': '<:HugeStormAgony:1462294256218673515>',
-  'HugeGoldenStormAgony': '<:HugeGoldenStormAgony:1462295167859167335>',
+  'HugeGoldenStormAgony': '📦',
   'HugeRainbowStormAgony': '📦',
 	
   'HugeBlackHoleAngelus': '<:HugeBlackHoleAngelus:1461868865758695646>',
