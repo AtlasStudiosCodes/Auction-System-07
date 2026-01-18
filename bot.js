@@ -3006,15 +3006,20 @@ client.on('interactionCreate', async (interaction) => {
     .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
   // CONFIGURAÇÃO DO AUTHOR (Avatar do Roblox)
-  if (robloxId && robloxId !== 'null' && robloxId !== '') {
+  if (robloxId && robloxId !== 'null' && robloxId !== '' && !isNaN(robloxId)) {
     // Link que redireciona diretamente para a imagem PNG do busto do avatar
     const avatarUrl = `https://www.roblox.com/headshot-thumbnail/image?userId=${robloxId}&width=420&height=420&format=png`;
+    
+    console.log(`Loading Roblox avatar for user ${interaction.user.username} with ID ${robloxId}: ${avatarUrl}`);
     
     embed.setAuthor({ 
       name: interaction.user.username, 
       iconURL: avatarUrl 
     });
   } else {
+    if (robloxInput) {
+      console.log(`Failed to load Roblox avatar for username: ${robloxInput} (resolved ID: ${robloxId})`);
+    }
     embed.setAuthor({ 
       name: interaction.user.username, 
       iconURL: interaction.user.displayAvatarURL() 
@@ -3066,22 +3071,29 @@ client.on('interactionCreate', async (interaction) => {
 // FUNÇÃO AUXILIAR (Coloque fora do evento de interação)
 async function getRobloxId(username) {
   try {
+    if (!username || username.trim() === '') return null;
+    
     const response = await fetch("https://users.roblox.com/v1/usernames/users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ usernames: [username], excludeBannedUsers: true })
+      body: JSON.stringify({ usernames: [username.trim()], excludeBannedUsers: true })
     });
+    
+    if (!response.ok) {
+      console.error(`Roblox API error: ${response.status} ${response.statusText}`);
+      return null;
+    }
+    
     const data = await response.json();
-    return data.data && data.data.length > 0 ? data.data[0].id : null;
+    if (data.data && data.data.length > 0 && data.data[0].id) {
+      return data.data[0].id;
+    }
+    return null;
   } catch (e) {
+    console.error('Error fetching Roblox ID:', e);
     return null;
   }
-
-      inventories.set(interaction.user.id, inventoryData);
-
-      await interaction.reply({ content: `Inventory created! Posted to the inventory channel.`, flags: 64 });
-      return;
-    }
+}
 
     if (interaction.customId === 'giveaway_setup_modal') {
       const giveawayItems = interaction.user.giveawayItems || [];
