@@ -825,7 +825,7 @@ client.on('interactionCreate', async (interaction) => {
         .setDescription('Welcome to the live auction system!\n\n**How it works:**\n- Auctions are held per channel to avoid conflicts.\n- Bidding can be done via text (e.g., "bid 10000") or slash commands.\n- The auction ends automatically after the set time, or can be ended early.\n- Winner is the highest bidder (diamonds first, then first bid if tie).\n\nClick the button below to create a new auction.')
         .setColor(0x00ff00)
         .setFooter({ text: `Version ${version} | Made By Atlas` })
-        .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
+        .setThumbnail('https://media.discordapp.net/attachments/1461506733833846958/1462497977888280819/AuctionGif_1.gif?ex=696e68e1&is=696d1761&hm=cfc43df2b6ffe3b1bcaf20feb70b5e4ce5b85c2d061aa129ffdb55f8cf3e3e6c&=&width=1593&height=902');
 
       const row = new ActionRowBuilder()
         .addComponents(
@@ -934,7 +934,7 @@ client.on('interactionCreate', async (interaction) => {
                         .setDescription(category.description)
                         .setColor(category.color)
                         .setFooter({ text: `Version ${version} | Made By Atlas` })
-                        .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
+                        .setThumbnail('https://media.discordapp.net/attachments/1461506733833846958/1462497977888280819/AuctionGif_1.gif?ex=696e68e1&is=696d1761&hm=cfc43df2b6ffe3b1bcaf20feb70b5e4ce5b85c2d061aa129ffdb55f8cf3e3e6c&=&width=1593&height=902');
 
                       const row = new ActionRowBuilder()
                         .addComponents(
@@ -1153,7 +1153,7 @@ client.on('interactionCreate', async (interaction) => {
         .setDescription('Welcome to the live trade system!\n\n**How it works:**\n- Create a trade offer with items or diamonds.\n- Other users can place their offers in response.\n- Host can accept or decline offers.\n- Once accepted, both users are notified.\n\nClick the button below to create a new trade.')
         .setColor(0x0099ff)
         .setFooter({ text: `Version ${version} | Made By Atlas` })
-        .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
+        .setThumbnail('https://media.discordapp.net/attachments/1461506733833846958/1462497977888280819/AuctionGif_1.gif?ex=696e68e1&is=696d1761&hm=cfc43df2b6ffe3b1bcaf20feb70b5e4ce5b85c2d061aa129ffdb55f8cf3e3e6c&=&width=1593&height=902');
 
       const row = new ActionRowBuilder()
         .addComponents(
@@ -1235,7 +1235,7 @@ client.on('interactionCreate', async (interaction) => {
         .setDescription('Welcome to the inventory system!\n\n**How it works:**\n- Create your personal inventory with items you have in stock.\n- Set your diamond amount and describe what you\'re looking for.\n- Optionally add your Roblox username to display your avatar.\n- Other users can see your inventory and make offers!\n- Update anytime - your previous items stay saved if you don\'t remove them.\n\nClick the button below to create or edit your inventory.')
         .setColor(0x00a8ff)
         .setFooter({ text: `Version ${version} | Made By Atlas` })
-        .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
+        .setThumbnail('https://media.discordapp.net/attachments/1461506733833846958/1462497977888280819/AuctionGif_1.gif?ex=696e68e1&is=696d1761&hm=cfc43df2b6ffe3b1bcaf20feb70b5e4ce5b85c2d061aa129ffdb55f8cf3e3e6c&=&width=1593&height=902');
 
       const row = new ActionRowBuilder()
         .addComponents(
@@ -1261,7 +1261,7 @@ client.on('interactionCreate', async (interaction) => {
         .setDescription('Welcome to the giveaway system!\n\n**How it works:**\n- Create a giveaway with items you want to give away.\n- Users can enter the giveaway by clicking the button.\n- Winners are selected randomly from all entries.\n- The role <@&1462168024151883836> will be mentioned when the giveaway starts!\n\nClick the button below to create a new giveaway.')
         .setColor(0xFF1493)
         .setFooter({ text: `Version ${version} | Made By Atlas` })
-        .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
+        .setThumbnail('https://media.discordapp.net/attachments/1461506733833846958/1462497977888280819/AuctionGif_1.gif?ex=696e68e1&is=696d1761&hm=cfc43df2b6ffe3b1bcaf20feb70b5e4ce5b85c2d061aa129ffdb55f8cf3e3e6c&=&width=1593&height=902');
 
       const row = new ActionRowBuilder()
         .addComponents(
@@ -3430,7 +3430,7 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (interaction.customId === 'inventory_setup_modal') {
-  const diamondsStr = interaction.fields.getTextInputValue('inv_diamonds') || '0';
+  const diamondsStr = interaction.fields.fields.has('inv_diamonds') ? interaction.fields.getTextInputValue('inv_diamonds') : '0';
   const lookingFor = interaction.fields.getTextInputValue('inv_looking_for') || 'Not specified';
   const robloxInput = interaction.fields.getTextInputValue('inv_roblox_username') || '';
 
