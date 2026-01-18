@@ -4050,3 +4050,5 @@ async function endAuction(channel) {
     auctionChannelId: '1461849894615646309'
   });
 }
+
+client.login(process.env.TOKEN);
