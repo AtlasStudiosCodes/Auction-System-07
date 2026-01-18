@@ -808,6 +808,19 @@ function parseDuration(str) {
   return minutes;
 }
 
+async function logAdminCommand(interaction, commandName) {
+  const logChannel = interaction.guild.channels.cache.get('1462502375607632126');
+  if (!logChannel) return;
+
+  const embed = new EmbedBuilder()
+    .setTitle('Admin Command Executed')
+    .setDescription(`**Command:** /${commandName}\n**User:** ${interaction.user}\n**Time:** <t:${Math.floor(Date.now() / 1000)}:F>`)
+    .setColor(0xF1C40F)
+    .setTimestamp();
+
+  await logChannel.send({ embeds: [embed] });
+}
+
 client.on('interactionCreate', async (interaction) => {
   if (interaction.isCommand()) {
     const { commandName } = interaction;
@@ -816,6 +829,8 @@ client.on('interactionCreate', async (interaction) => {
       const adminRoles = ['1461505505401896972', '1461481291118678087', '1461484563183435817'];
       const hasAdminRole = interaction.member.roles.cache.some(role => adminRoles.includes(role.id));
       if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+
+      await logAdminCommand(interaction, commandName);
 
       const versionFile = require('./version.json');
       const version = versionFile.auction || '1.0.0';
@@ -842,6 +857,8 @@ client.on('interactionCreate', async (interaction) => {
       const adminRoles = ['1461505505401896972', '1461481291118678087', '1461484563183435817'];
       const hasAdminRole = interaction.member.roles.cache.some(role => adminRoles.includes(role.id));
       if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+
+      await logAdminCommand(interaction, commandName);
 
       try {
         await interaction.deferReply({ ephemeral: true });
@@ -1031,6 +1048,9 @@ client.on('interactionCreate', async (interaction) => {
 
     if (commandName === 'deleteauction') {
       if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+
+      await logAdminCommand(interaction, commandName);
+
       const messageId = interaction.options.getString('messageid');
       const auction = Array.from(auctions.values()).find(a => a.messageId === messageId);
       if (!auction) return interaction.reply({ content: 'Auction not found.', ephemeral: true });
@@ -1051,6 +1071,9 @@ client.on('interactionCreate', async (interaction) => {
 
     if (commandName === 'endauctionadmin') {
       if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+
+      await logAdminCommand(interaction, commandName);
+
       const messageId = interaction.options.getString('messageid');
       const auction = Array.from(auctions.values()).find(a => a.messageId === messageId);
       if (!auction) return interaction.reply({ content: 'Auction not found.', ephemeral: true });
@@ -1064,6 +1087,9 @@ client.on('interactionCreate', async (interaction) => {
 
     if (commandName === 'restartauction') {
       if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+
+      await logAdminCommand(interaction, commandName);
+
       const messageId = interaction.options.getString('messageid');
       const auction = Array.from(auctions.values()).find(a => a.messageId === messageId);
       if (!auction) return interaction.reply({ content: 'Auction not found.', ephemeral: true });
@@ -1105,6 +1131,9 @@ client.on('interactionCreate', async (interaction) => {
 
     if (commandName === 'redirectauctions') {
       if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+
+      await logAdminCommand(interaction, commandName);
+
       const channel = interaction.options.getChannel('channel');
       if (channel.type !== 0) return interaction.reply({ content: 'Please select a text channel.', ephemeral: true });
       redirectChannelId = channel.id;
@@ -1113,6 +1142,9 @@ client.on('interactionCreate', async (interaction) => {
 
     if (commandName === 'redirecttrade') {
       if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+
+      await logAdminCommand(interaction, commandName);
+
       const channel = interaction.options.getChannel('channel');
       if (channel.type !== 0) return interaction.reply({ content: 'Please select a text channel.', ephemeral: true });
       redirectTradeChannelId = channel.id;
@@ -1121,6 +1153,9 @@ client.on('interactionCreate', async (interaction) => {
 
     if (commandName === 'redirectinventory') {
       if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+
+      await logAdminCommand(interaction, commandName);
+
       const channel = interaction.options.getChannel('channel');
       if (channel.type !== 0) return interaction.reply({ content: 'Please select a text channel.', ephemeral: true });
       redirectInventoryChannelId = channel.id;
@@ -1132,6 +1167,8 @@ client.on('interactionCreate', async (interaction) => {
       const adminRoles = ['1461505505401896972', '1461481291118678087', '1461484563183435817'];
       const hasAdminRole = interaction.member.roles.cache.some(role => adminRoles.includes(role.id));
       if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+
+      await logAdminCommand(interaction, commandName);
 
       // Check trade limit
       const isAdmin = true; // Already checked admin above
@@ -1171,6 +1208,8 @@ client.on('interactionCreate', async (interaction) => {
       const hasAdminRole = interaction.member.roles.cache.some(role => adminRoles.includes(role.id));
       if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
 
+      await logAdminCommand(interaction, commandName);
+
       const messageId = interaction.options.getString('messageid');
       const trade = trades.get(messageId);
       if (!trade) return interaction.reply({ content: 'Trade not found.', ephemeral: true });
@@ -1200,6 +1239,8 @@ client.on('interactionCreate', async (interaction) => {
       const hasAdminRole = interaction.member.roles.cache.some(role => adminRoles.includes(role.id));
       if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
 
+      await logAdminCommand(interaction, commandName);
+
       const messageId = interaction.options.getString('messageid');
       const trade = trades.get(messageId);
       if (!trade) return interaction.reply({ content: 'Trade not found.', ephemeral: true });
@@ -1227,6 +1268,8 @@ client.on('interactionCreate', async (interaction) => {
       const hasAdminRole = interaction.member.roles.cache.some(role => adminRoles.includes(role.id));
       if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
 
+      await logAdminCommand(interaction, commandName);
+
       const versionFile = require('./version.json');
       const version = versionFile.inventory || '1.0.0';
 
@@ -1252,6 +1295,8 @@ client.on('interactionCreate', async (interaction) => {
       const adminRoles = ['1461505505401896972', '1461481291118678087', '1461484563183435817'];
       const hasAdminRole = interaction.member.roles.cache.some(role => adminRoles.includes(role.id));
       if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+
+      await logAdminCommand(interaction, commandName);
 
       const versionFile = require('./version.json');
       const version = versionFile.giveaway || '1.0.0';
@@ -1280,6 +1325,8 @@ client.on('interactionCreate', async (interaction) => {
       const hasAdminRole = interaction.member.roles.cache.some(role => adminRoles.includes(role.id));
       if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
 
+      await logAdminCommand(interaction, commandName);
+
       try {
         await saveData();
         await interaction.reply({ content: '✅ All bot data has been successfully saved to Redis!', ephemeral: true });
@@ -1294,6 +1341,8 @@ client.on('interactionCreate', async (interaction) => {
       const adminRoles = ['1461505505401896972', '1461481291118678087', '1461484563183435817'];
       const hasAdminRole = interaction.member.roles.cache.some(role => adminRoles.includes(role.id));
       if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+
+      await logAdminCommand(interaction, commandName);
 
       const amount = interaction.options.getInteger('amount');
       
