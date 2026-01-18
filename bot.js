@@ -2242,6 +2242,9 @@ client.on('interactionCreate', async (interaction) => {
         const row = new ActionRowBuilder().addComponents(categorySelect);
         await interaction.reply({ content: 'Select another item category:', components: [row], flags: 64 });
       } else if (choice === 'continue_to_setup') {
+        // Load previous inventory data to pre-fill modal
+        const previousInventory = inventories.get(interaction.user.id);
+        
         // Move to inventory setup modal
         const inventoryModal = new ModalBuilder()
           .setCustomId('inventory_setup_modal')
@@ -2252,6 +2255,7 @@ client.on('interactionCreate', async (interaction) => {
           .setLabel('Diamonds in stock (optional)')
           .setStyle(TextInputStyle.Short)
           .setPlaceholder('0')
+          .setValue(previousInventory ? previousInventory.diamonds.toString() : '0')
           .setRequired(false);
 
         const lookingForInput = new TextInputBuilder()
@@ -2259,6 +2263,7 @@ client.on('interactionCreate', async (interaction) => {
           .setLabel('What are you looking for?')
           .setStyle(TextInputStyle.Paragraph)
           .setPlaceholder('Describe what items/diamonds you\'re looking for')
+          .setValue(previousInventory ? previousInventory.lookingFor : '')
           .setRequired(true);
 
         const robloxInput = new TextInputBuilder()
@@ -2266,6 +2271,7 @@ client.on('interactionCreate', async (interaction) => {
           .setLabel('Roblox username (optional)')
           .setStyle(TextInputStyle.Short)
           .setPlaceholder('YourRobloxUsername')
+          .setValue(previousInventory ? previousInventory.robloxUsername : '')
           .setRequired(false);
 
         const row1 = new ActionRowBuilder().addComponents(diamondsInput);
@@ -3105,36 +3111,38 @@ async function getRobloxId(username) {
   }
 }
 
-// Função para pegar o avatar do Roblox
+// Função para pegar o avatar do Roblox usando a API oficial
 async function getRobloxAvatarUrl(userId) {
   try {
     if (!userId || isNaN(userId)) return null;
     
-    const profileUrl = `https://www.roblox.com/users/${userId}/profile`;
-    console.log(`Fetching Roblox profile for avatar: ${profileUrl}`);
+    const apiUrl = `https://thumbnails.roblox.com/v1/users/avatar?userIds=${userId}&size=720x720&format=Png&isCircular=false`;
+    console.log(`Fetching Roblox avatar from API: ${apiUrl}`);
     
-    const response = await fetch(profileUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-      }
-    });
+    const response = await fetch(apiUrl);
     
     if (!response.ok) {
-      console.error(`Roblox profile error: ${response.status}`);
+      console.error(`Roblox API error: ${response.status}`);
       return null;
     }
     
-    const html = await response.text();
-    // Procura pela meta tag og:image
-    const match = html.match(/property="og:image"\s+content="([^"]+)"/);
+    const data = await response.json();
     
-    if (match && match[1]) {
-      const imageUrl = match[1];
-      console.log(`✅ Avatar URL extracted from og:image`);
-      return imageUrl;
+    // Verificar se a API retornou dados
+    if (data.data && data.data.length > 0) {
+      const avatarData = data.data[0];
+      
+      // Verificar se o estado é "Completed" e se há imageUrl
+      if (avatarData.state === 'Completed' && avatarData.imageUrl) {
+        console.log(`✅ Avatar URL obtido com sucesso para user ${userId}`);
+        return avatarData.imageUrl;
+      } else {
+        console.log(`⚠️ Avatar state: ${avatarData.state}`);
+        return null;
+      }
     }
     
-    console.log(`⚠️ og:image não encontrado no perfil`);
+    console.log(`⚠️ Nenhum dado de avatar retornado pela API`);
     return null;
   } catch (e) {
     console.error('Error fetching Roblox avatar URL:', e.message);
