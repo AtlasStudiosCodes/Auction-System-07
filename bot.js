@@ -1594,11 +1594,11 @@ client.on('interactionCreate', async (interaction) => {
         .setCustomId(`offer_category_select_${interaction.message.id}`)
         .setPlaceholder('Select an item category')
         .addOptions([
+          { label: 'Diamonds', value: 'diamonds', emoji: '💎' },
           { label: 'Huges', value: 'huges', emoji: '🔥' },
           { label: 'Exclusives', value: 'exclusives', emoji: '✨' },
           { label: 'Eggs', value: 'eggs', emoji: '🥚' },
-          { label: 'Gifts', value: 'gifts', emoji: '🎁' },
-          { label: 'Diamonds', value: 'diamonds', emoji: '💎' }
+          { label: 'Gifts', value: 'gifts', emoji: '🎁' }
         ]);
 
       const row = new ActionRowBuilder().addComponents(categorySelect);
@@ -1779,11 +1779,11 @@ client.on('interactionCreate', async (interaction) => {
         .setCustomId('inventory_category_select')
         .setPlaceholder('Select an item category')
         .addOptions([
+          { label: 'Diamonds', value: 'diamonds', emoji: '💎' },
           { label: 'Huges', value: 'huges', emoji: '🔥' },
           { label: 'Exclusives', value: 'exclusives', emoji: '✨' },
           { label: 'Eggs', value: 'eggs', emoji: '🥚' },
-          { label: 'Gifts', value: 'gifts', emoji: '🎁' },
-          { label: 'Diamonds', value: 'diamonds', emoji: '💎' }
+          { label: 'Gifts', value: 'gifts', emoji: '🎁' }
         ]);
 
       const row = new ActionRowBuilder().addComponents(categorySelect);
@@ -2005,12 +2005,12 @@ client.on('interactionCreate', async (interaction) => {
           .setCustomId('trade_category_select')
           .setPlaceholder('Select another item category')
           .addOptions([
-            { label: 'Huges', value: 'huges', emoji: '🔥' },
-            { label: 'Exclusives', value: 'exclusives', emoji: '✨' },
-            { label: 'Eggs', value: 'eggs', emoji: '🥚' },
-            { label: 'Gifts', value: 'gifts', emoji: '🎁' },
-            { label: 'Diamonds', value: 'diamonds', emoji: '💎' }
-          ]);
+          { label: 'Diamonds', value: 'diamonds', emoji: '💎' },
+          { label: 'Huges', value: 'huges', emoji: '🔥' },
+          { label: 'Exclusives', value: 'exclusives', emoji: '✨' },
+          { label: 'Eggs', value: 'eggs', emoji: '🥚' },
+          { label: 'Gifts', value: 'gifts', emoji: '🎁' }
+        ]);
 
         const row = new ActionRowBuilder().addComponents(categorySelect);
         await interaction.reply({ content: 'Select another item category:', components: [row], flags: 64 });
@@ -2069,12 +2069,12 @@ client.on('interactionCreate', async (interaction) => {
           .setCustomId(`offer_category_select_${messageId}`)
           .setPlaceholder('Select another item category')
           .addOptions([
-            { label: 'Huges', value: 'huges', emoji: '🔥' },
-            { label: 'Exclusives', value: 'exclusives', emoji: '✨' },
-            { label: 'Eggs', value: 'eggs', emoji: '🥚' },
-            { label: 'Gifts', value: 'gifts', emoji: '🎁' },
-            { label: 'Diamonds', value: 'diamonds', emoji: '💎' }
-          ]);
+          { label: 'Diamonds', value: 'diamonds', emoji: '💎' },
+          { label: 'Huges', value: 'huges', emoji: '🔥' },
+          { label: 'Exclusives', value: 'exclusives', emoji: '✨' },
+          { label: 'Eggs', value: 'eggs', emoji: '🥚' },
+          { label: 'Gifts', value: 'gifts', emoji: '🎁' }
+        ]);
 
         const row = new ActionRowBuilder().addComponents(categorySelect);
         await interaction.reply({ content: 'Select another item category:', components: [row], flags: 64 });
@@ -2183,12 +2183,12 @@ client.on('interactionCreate', async (interaction) => {
           .setCustomId('inventory_category_select')
           .setPlaceholder('Select another item category')
           .addOptions([
-            { label: 'Huges', value: 'huges', emoji: '🔥' },
-            { label: 'Exclusives', value: 'exclusives', emoji: '✨' },
-            { label: 'Eggs', value: 'eggs', emoji: '🥚' },
-            { label: 'Gifts', value: 'gifts', emoji: '🎁' },
-            { label: 'Diamonds', value: 'diamonds', emoji: '💎' }
-          ]);
+          { label: 'Diamonds', value: 'diamonds', emoji: '💎' },
+          { label: 'Huges', value: 'huges', emoji: '🔥' },
+          { label: 'Exclusives', value: 'exclusives', emoji: '✨' },
+          { label: 'Eggs', value: 'eggs', emoji: '🥚' },
+          { label: 'Gifts', value: 'gifts', emoji: '🎁' }
+        ]);
 
         const row = new ActionRowBuilder().addComponents(categorySelect);
         await interaction.reply({ content: 'Select another item category:', components: [row], flags: 64 });
