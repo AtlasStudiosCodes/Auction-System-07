@@ -3045,7 +3045,7 @@ client.on('interactionCreate', async (interaction) => {
   // Restante do preenchimento do embed...
   const itemsText = formatItemsText(inventoryItems);
   embed.addFields({ 
-    name: `Items${diamonds > 0 ? ` + ${diamonds.toLocaleString()} 💎` : 'None'}`,
+    name: `Items${diamonds > 0 ? ` + ${formatBid(diamonds)} 💎` : 'None'}`,
     value: itemsText,
     inline: true
   });
