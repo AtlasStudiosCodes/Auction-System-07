@@ -2220,6 +2220,13 @@ client.on('interactionCreate', async (interaction) => {
       
       let items = [];
       if (category === 'diamonds') {
+        // Check if diamonds are already added
+        const hasDiamonds = (interaction.user.tradeItems || []).some(item => item.name === '💎 Diamonds');
+        
+        if (hasDiamonds) {
+          return await interaction.reply({ content: '❌ Diamonds have already been added to your trade. You cannot add them again.', flags: 64 });
+        }
+        
         // Show modal for diamonds input
         const diamondsModal = new ModalBuilder()
           .setCustomId('trade_diamonds_modal')
@@ -2326,6 +2333,13 @@ client.on('interactionCreate', async (interaction) => {
       const { StringSelectMenuBuilder } = require('discord.js');
       
       if (category === 'diamonds') {
+        // Check if diamonds are already added
+        const hasDiamonds = (interaction.user.offerTradeItems || []).some(item => item.name === '💎 Diamonds');
+        
+        if (hasDiamonds) {
+          return await interaction.reply({ content: '❌ Diamonds have already been added to your offer. You cannot add them again.', flags: 64 });
+        }
+        
         const diamondsModal = new ModalBuilder()
           .setCustomId(`offer_diamonds_modal_${messageId}`)
           .setTitle('Add Diamonds to Offer');
@@ -2453,17 +2467,26 @@ client.on('interactionCreate', async (interaction) => {
         const row = new ActionRowBuilder().addComponents(itemSelect);
         await interaction.reply({ content: 'Select items to remove:', components: [row], flags: 64 });
       } else if (choice === 'confirm_items') {
+        // Check if diamonds are already added as items
+        const hasDiamonds = (interaction.user.tradeItems || []).some(item => item.name === '💎 Diamonds');
+        
         // Move to diamonds and target user
         const diamondsModal = new ModalBuilder()
           .setCustomId('trade_setup_modal')
           .setTitle('Complete Your Trade Offer');
 
-        const diamondsInput = new TextInputBuilder()
-          .setCustomId('trade_diamonds')
-          .setLabel('Diamonds (optional)')
-          .setStyle(TextInputStyle.Short)
-          .setPlaceholder('0')
-          .setRequired(false);
+        // Only show diamonds input if not already added as items
+        if (!hasDiamonds) {
+          const diamondsInput = new TextInputBuilder()
+            .setCustomId('trade_diamonds')
+            .setLabel('Diamonds (optional)')
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder('0')
+            .setRequired(false);
+
+          const row1 = new ActionRowBuilder().addComponents(diamondsInput);
+          diamondsModal.addComponents(row1);
+        }
 
         const userInput = new TextInputBuilder()
           .setCustomId('trade_target_user')
@@ -2472,10 +2495,14 @@ client.on('interactionCreate', async (interaction) => {
           .setPlaceholder('Leave empty for open trade')
           .setRequired(false);
 
-        const row1 = new ActionRowBuilder().addComponents(diamondsInput);
         const row2 = new ActionRowBuilder().addComponents(userInput);
+        
+        if (!hasDiamonds) {
+          diamondsModal.addComponents(row2);
+        } else {
+          diamondsModal.addComponents(row2);
+        }
 
-        diamondsModal.addComponents(row1, row2);
         await interaction.showModal(diamondsModal);
       }
     }
@@ -2501,20 +2528,26 @@ client.on('interactionCreate', async (interaction) => {
         const row = new ActionRowBuilder().addComponents(categorySelect);
         await interaction.reply({ content: 'Select another item category:', components: [row], flags: 64 });
       } else if (choice === 'confirm_items') {
+        // Check if diamonds are already added
+        const hasDiamonds = (interaction.user.offerTradeItems || []).some(item => item.name === '💎 Diamonds');
+        
         // Move to diamonds and submit
         const diamondsModal = new ModalBuilder()
           .setCustomId(`offer_submit_modal_${messageId}`)
           .setTitle('Complete Your Offer');
 
-        const diamondsInput = new TextInputBuilder()
-          .setCustomId('offer_diamonds')
-          .setLabel('Diamonds (optional)')
-          .setStyle(TextInputStyle.Short)
-          .setPlaceholder('0')
-          .setRequired(false);
+        // Only show diamonds input if not already added
+        if (!hasDiamonds) {
+          const diamondsInput = new TextInputBuilder()
+            .setCustomId('offer_diamonds')
+            .setLabel('Diamonds (optional)')
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder('0')
+            .setRequired(false);
 
-        const row1 = new ActionRowBuilder().addComponents(diamondsInput);
-        diamondsModal.addComponents(row1);
+          const row1 = new ActionRowBuilder().addComponents(diamondsInput);
+          diamondsModal.addComponents(row1);
+        }
         
         // Store items in interaction metadata
         interaction.user.offerItems = interaction.user.offerTradeItems || [];
@@ -2618,18 +2651,27 @@ client.on('interactionCreate', async (interaction) => {
         // Load previous inventory data to pre-fill modal
         const previousInventory = inventories.get(interaction.user.id);
         
+        // Check if diamonds are already added as items
+        const hasDiamonds = (interaction.user.inventoryItems || []).some(item => item.name === '💎 Diamonds');
+        
         // Move to inventory setup modal
         const inventoryModal = new ModalBuilder()
           .setCustomId('inventory_setup_modal')
           .setTitle('Complete Your Inventory');
 
-        const diamondsInput = new TextInputBuilder()
-          .setCustomId('inv_diamonds')
-          .setLabel('Diamonds in stock (optional)')
-          .setStyle(TextInputStyle.Short)
-          .setPlaceholder('0')
-          .setValue(previousInventory ? previousInventory.diamonds.toString() : '0')
-          .setRequired(false);
+        // Only show diamonds input if not already added as items
+        if (!hasDiamonds) {
+          const diamondsInput = new TextInputBuilder()
+            .setCustomId('inv_diamonds')
+            .setLabel('Diamonds in stock (optional)')
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder('0')
+            .setValue(previousInventory ? previousInventory.diamonds.toString() : '0')
+            .setRequired(false);
+
+          const row1 = new ActionRowBuilder().addComponents(diamondsInput);
+          inventoryModal.addComponents(row1);
+        }
 
         const lookingForInput = new TextInputBuilder()
           .setCustomId('inv_looking_for')
@@ -2647,11 +2689,14 @@ client.on('interactionCreate', async (interaction) => {
           .setValue(previousInventory ? previousInventory.robloxUsername : '')
           .setRequired(false);
 
-        const row1 = new ActionRowBuilder().addComponents(diamondsInput);
         const row2 = new ActionRowBuilder().addComponents(lookingForInput);
         const row3 = new ActionRowBuilder().addComponents(robloxInput);
 
-        inventoryModal.addComponents(row1, row2, row3);
+        if (!hasDiamonds) {
+          inventoryModal.addComponents(row2, row3);
+        } else {
+          inventoryModal.addComponents(row2, row3);
+        }
         
         delete interaction.user.selectedInventoryItems;
         delete interaction.user.selectedInventoryCategory;
@@ -2850,6 +2895,13 @@ client.on('interactionCreate', async (interaction) => {
       const { StringSelectMenuBuilder } = require('discord.js');
       
       if (category === 'diamonds') {
+        // Check if diamonds are already added
+        const hasDiamonds = (interaction.user.inventoryItems || []).some(item => item.name === '💎 Diamonds');
+        
+        if (hasDiamonds) {
+          return await interaction.reply({ content: '❌ Diamonds have already been added to your inventory. You cannot add them again.', flags: 64 });
+        }
+        
         const diamondsModal = new ModalBuilder()
           .setCustomId('inventory_diamonds_modal')
           .setTitle('Add Diamonds');
@@ -2949,6 +3001,13 @@ client.on('interactionCreate', async (interaction) => {
       const { StringSelectMenuBuilder } = require('discord.js');
       
       if (category === 'diamonds') {
+        // Check if diamonds are already added
+        const hasDiamonds = (interaction.user.giveawayItems || []).some(item => item.name === '💎 Diamonds');
+        
+        if (hasDiamonds) {
+          return await interaction.reply({ content: '❌ Diamonds have already been added to your giveaway. You cannot add them again.', flags: 64 });
+        }
+        
         // Show modal for diamonds input
         const diamondsModal = new ModalBuilder()
           .setCustomId('giveaway_diamonds_modal')
