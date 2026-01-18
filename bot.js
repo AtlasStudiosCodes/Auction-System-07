@@ -3287,7 +3287,9 @@ client.on('interactionCreate', async (interaction) => {
   embed.addFields({ name: 'Looking For', value: lookingFor, inline: true });
 
   const now = new Date();
-  const timeStr = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()} at ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+  // Adjust to GMT-5 (UTC-5)
+  const gmt5Time = new Date(now.getTime() - (5 * 60 * 60 * 1000));
+  const timeStr = `${gmt5Time.getDate()}/${gmt5Time.getMonth() + 1}/${gmt5Time.getFullYear()} at ${gmt5Time.getHours().toString().padStart(2, '0')}:${gmt5Time.getMinutes().toString().padStart(2, '0')}`;
   embed.addFields({ name: 'Last Edited', value: timeStr, inline: false });
 
   // Buttons and sending...
@@ -3313,7 +3315,7 @@ client.on('interactionCreate', async (interaction) => {
     diamonds: diamonds,
     lookingFor: lookingFor,
     robloxUsername: robloxInput, // guarda o que o user digitou
-    lastEdited: now
+    lastEdited: gmt5Time
   };
   inventories.set(interaction.user.id, inventoryData);
 }
