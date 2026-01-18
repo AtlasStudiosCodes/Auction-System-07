@@ -1883,7 +1883,7 @@ client.on('interactionCreate', async (interaction) => {
         .setTitle('Select Quantities');
 
       let inputs = [];
-      selectedItems.slice(0, 5).forEach((item, index) => {
+      selecteditems.slice(0, 25).forEach((item, index) => {
         const input = new TextInputBuilder()
           .setCustomId(`qty_${index}`)
           .setLabel(`${item} quantity`)
@@ -1980,7 +1980,7 @@ client.on('interactionCreate', async (interaction) => {
         .setTitle('Select Quantities');
 
       let inputs = [];
-      selectedItems.slice(0, 5).forEach((item, index) => {
+      selecteditems.slice(0, 25).forEach((item, index) => {
         const input = new TextInputBuilder()
           .setCustomId(`offer_qty_${index}`)
           .setLabel(`${item} quantity`)
@@ -2501,7 +2501,7 @@ client.on('interactionCreate', async (interaction) => {
         .setTitle('Select Quantities');
 
       let inputs = [];
-      selectedItems.slice(0, 5).forEach((item, index) => {
+      selecteditems.slice(0, 25).forEach((item, index) => {
         const input = new TextInputBuilder()
           .setCustomId(`inv_qty_${index}`)
           .setLabel(`${item} quantity`)
@@ -2603,7 +2603,7 @@ client.on('interactionCreate', async (interaction) => {
         .setTitle('Select Quantities');
 
       let inputs = [];
-      selectedItems.slice(0, 5).forEach((item, index) => {
+      selecteditems.slice(0, 25).forEach((item, index) => {
         const input = new TextInputBuilder()
           .setCustomId(`gwa_qty_${index}`)
           .setLabel(`${item} quantity`)
