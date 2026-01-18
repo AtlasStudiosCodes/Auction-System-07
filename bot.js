@@ -3008,16 +3008,24 @@ client.on('interactionCreate', async (interaction) => {
 
   // CONFIGURAÇÃO DO AUTHOR (Avatar do Roblox)
   if (robloxId && robloxId !== 'null' && robloxId !== '' && !isNaN(robloxId)) {
-    // Link que redireciona diretamente para a imagem PNG do busto do avatar
-    // Usando o endpoint correto da Roblox: headshot-thumbnail.roblox.com
-    const avatarUrl = `https://headshot-thumbnail.roblox.com/v1/avatar-headshot?userIds=${robloxId}&width=420&height=420&format=png`;
+    // Buscar o avatar do usuário Roblox
+    const avatarUrl = await getRobloxAvatarUrl(robloxId);
     
-    console.log(`Loading Roblox avatar for user ${interaction.user.username} with ID ${robloxId}: ${avatarUrl}`);
-    
-    embed.setAuthor({ 
-      name: interaction.user.username, 
-      iconURL: avatarUrl 
-    });
+    if (avatarUrl) {
+      console.log(`Loading Roblox avatar for user ${interaction.user.username} with ID ${robloxId}: ${avatarUrl}`);
+      
+      embed.setAuthor({ 
+        name: interaction.user.username, 
+        iconURL: avatarUrl 
+      });
+    } else {
+      // Se falhar em pegar o avatar do Roblox, usa o avatar do Discord
+      console.log(`Failed to fetch Roblox avatar for ID ${robloxId}, using Discord avatar`);
+      embed.setAuthor({ 
+        name: interaction.user.username, 
+        iconURL: interaction.user.displayAvatarURL() 
+      });
+    }
   } else {
     if (robloxInput) {
       console.log(`Failed to load Roblox avatar for username: ${robloxInput} (resolved ID: ${robloxId})`);
@@ -3097,6 +3105,43 @@ async function getRobloxId(username) {
   }
 }
 
+// Função para pegar o avatar do Roblox
+async function getRobloxAvatarUrl(userId) {
+  try {
+    if (!userId || isNaN(userId)) return null;
+    
+    const profileUrl = `https://www.roblox.com/users/${userId}/profile`;
+    console.log(`Fetching Roblox profile for avatar: ${profileUrl}`);
+    
+    const response = await fetch(profileUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    });
+    
+    if (!response.ok) {
+      console.error(`Roblox profile error: ${response.status}`);
+      return null;
+    }
+    
+    const html = await response.text();
+    // Procura pela meta tag og:image
+    const match = html.match(/property="og:image"\s+content="([^"]+)"/);
+    
+    if (match && match[1]) {
+      const imageUrl = match[1];
+      console.log(`✅ Avatar URL extracted from og:image`);
+      return imageUrl;
+    }
+    
+    console.log(`⚠️ og:image não encontrado no perfil`);
+    return null;
+  } catch (e) {
+    console.error('Error fetching Roblox avatar URL:', e.message);
+    return null;
+  }
+}
+  
     if (interaction.customId === 'giveaway_setup_modal') {
       const giveawayItems = interaction.user.giveawayItems || [];
       const description = interaction.fields.getTextInputValue('gwa_description') || '';
