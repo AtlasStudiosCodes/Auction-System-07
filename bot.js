@@ -69,6 +69,7 @@ const giveaways = new Map(); // messageId -> { host, items: [{name, quantity}], 
 // Item categories for trades
 const itemCategories = {
   huges: {
+    'AuctionBotIcon': ['AuctionBotIcon'],
     'Black Hole Huges': ['HugeBlackHoleAngelus', 'HugeRainbowBlackHoleAngelus'],
     'Snow Globe Huges': ['HugeSnowGlobeHamster', 'HugeRainbowSnowGlobeHamster', 'HugeSnowGlobeCat', 'HugeRainbowSnowGlobeCat'],
     'Ice Cube Huges': ['HugeIceCubeGingerbreadCorgi', 'HugeRainbowIceCubeGingerbreadCorgi', 'HugeIceCubeCookieCutCat', 'HugeRainbowIceCubeCookieCutCat'],
@@ -88,6 +89,7 @@ const itemCategories = {
 const giveawayItemCategories = {
   diamonds: [],
   huges: {
+    'AuctionBotIcon': ['AuctionBotIcon'],
     'Black Hole Huges': ['HugeBlackHoleAngelus', 'HugeRainbowBlackHoleAngelus'],
     'Snow Globe Huges': ['HugeSnowGlobeHamster', 'HugeRainbowSnowGlobeHamster', 'HugeSnowGlobeCat', 'HugeRainbowSnowGlobeCat'],
     'Ice Cube Huges': ['HugeIceCubeGingerbreadCorgi', 'HugeRainbowIceCubeGingerbreadCorgi', 'HugeIceCubeCookieCutCat', 'HugeRainbowIceCubeCookieCutCat'],
@@ -105,7 +107,8 @@ const giveawayItemCategories = {
 
 // Item emojis mapping - customize with your server emojis
 const itemEmojis = {
-  //Huges
+  //Huges 1462559347853889648
+  'AuctionBotIcon': '<:AuctionBotIcon:1462559347853889648>',
   'HugeBlackHoleAngelus': '<:HugeBlackHoleAngelus:1461868865758695646>',
   'HugeRainbowBlackHoleAngelus': '📦',
   'HugeSnowGlobeHamster': '<:HugeSnowGlobeHamster:1461512580970618881>',
