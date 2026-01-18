@@ -1105,10 +1105,10 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (commandName === 'savedata') {
-      // Check if user has admin permissions (you can adjust this check)
-      if (!interaction.member.permissions.has('Administrator')) {
-        return interaction.reply({ content: '❌ You need Administrator permissions to use this command.', ephemeral: true });
-      }
+      // Check if user has admin role (same as other admin commands)
+      const adminRoles = ['1461505505401896972', '1461481291118678087', '1461484563183435817'];
+      const hasAdminRole = interaction.member.roles.cache.some(role => adminRoles.includes(role.id));
+      if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
 
       try {
         await saveData();
