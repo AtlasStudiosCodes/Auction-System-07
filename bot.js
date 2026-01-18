@@ -2422,8 +2422,9 @@ client.on('interactionCreate', async (interaction) => {
       
       const selectedItems = interaction.values;
 
-      // Store items selection for quantity input
-      interaction.user.selectedTradeItems = selectedItems;
+      // Store items selection for quantity input (limit to 25)
+      const limitedItems = selectedItems.slice(0, 25);
+      interaction.user.selectedTradeItems = limitedItems;
       interaction.user.selectedTradeCategory = category;
       interaction.user.selectedTradeSubcategory = subcategory;
 
@@ -2432,19 +2433,16 @@ client.on('interactionCreate', async (interaction) => {
         .setCustomId(`trade_item_quantities_modal`)
         .setTitle('Select Quantities');
 
-      let inputs = [];
-      selectedItems.slice(0, 5).forEach((item, index) => {
-        const input = new TextInputBuilder()
-          .setCustomId(`qty_${index}`)
-          .setLabel(`${item} quantity`)
-          .setStyle(TextInputStyle.Short)
-          .setPlaceholder('1')
-          .setRequired(true)
-          .setMaxLength(3);
-        inputs.push(new ActionRowBuilder().addComponents(input));
-      });
+      const quantitiesInput = new TextInputBuilder()
+        .setCustomId('quantities')
+        .setLabel(`Quantities for ${limitedItems.length} items (comma separated)`)
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder('1,2,3,... (one per item)')
+        .setRequired(true);
 
-      quantityModal.addComponents(inputs);
+      const row = new ActionRowBuilder().addComponents(quantitiesInput);
+      quantityModal.addComponents(row);
+
       await interaction.showModal(quantityModal);
     }
 
@@ -2519,7 +2517,9 @@ client.on('interactionCreate', async (interaction) => {
       const selectedItems = interaction.values;
 
       // Store items selection for quantity input
-      interaction.user.selectedOfferItems = selectedItems;
+      // Store items selection for quantity input (limit to 25)
+      const limitedItems = selectedItems.slice(0, 25);
+      interaction.user.selectedOfferItems = limitedItems;
       interaction.user.selectedOfferCategory = category;
       interaction.user.selectedOfferSubcategory = subcategory;
       interaction.user.selectedOfferMessageId = messageId;
@@ -2529,19 +2529,16 @@ client.on('interactionCreate', async (interaction) => {
         .setCustomId(`offer_item_quantities_modal_${messageId}`)
         .setTitle('Select Quantities');
 
-      let inputs = [];
-      selectedItems.slice(0, 5).forEach((item, index) => {
-        const input = new TextInputBuilder()
-          .setCustomId(`offer_qty_${index}`)
-          .setLabel(`${item} quantity`)
-          .setStyle(TextInputStyle.Short)
-          .setPlaceholder('1')
-          .setRequired(true)
-          .setMaxLength(3);
-        inputs.push(new ActionRowBuilder().addComponents(input));
-      });
+      const quantitiesInput = new TextInputBuilder()
+        .setCustomId('offer_quantities')
+        .setLabel(`Quantities for ${limitedItems.length} items (comma separated)`)
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder('1,2,3,... (one per item)')
+        .setRequired(true);
 
-      quantityModal.addComponents(inputs);
+      const row = new ActionRowBuilder().addComponents(quantitiesInput);
+      quantityModal.addComponents(row);
+
       await interaction.showModal(quantityModal);
     }
 
@@ -3397,9 +3394,14 @@ client.on('interactionCreate', async (interaction) => {
       const subcategory = interaction.user.selectedTradeSubcategory;
 
       // Process quantities
+      const quantitiesStr = interaction.fields.getTextInputValue('quantities');
+      const quantities = quantitiesStr.split(',').map(q => parseInt(q.trim()) || 1);
+      if (quantities.length !== selectedItems.length) {
+        return interaction.reply({ content: `Please provide exactly ${selectedItems.length} quantities separated by commas.`, flags: MessageFlags.Ephemeral });
+      }
       const itemsWithQty = selectedItems.map((item, index) => {
-        const qty = parseInt(interaction.fields.getTextInputValue(`qty_${index}`) || '1');
-        return { name: item, quantity: Math.max(1, qty) };
+        const qty = Math.max(1, quantities[index]);
+        return { name: item, quantity: qty };
       });
 
       // Store in user's session
@@ -3457,9 +3459,14 @@ client.on('interactionCreate', async (interaction) => {
       const subcategory = interaction.user.selectedOfferSubcategory;
 
       // Process quantities
+      const quantitiesStr = interaction.fields.getTextInputValue('offer_quantities');
+      const quantities = quantitiesStr.split(',').map(q => parseInt(q.trim()) || 1);
+      if (quantities.length !== selectedItems.length) {
+        return interaction.reply({ content: `Please provide exactly ${selectedItems.length} quantities separated by commas.`, flags: MessageFlags.Ephemeral });
+      }
       const itemsWithQty = selectedItems.map((item, index) => {
-        const qty = parseInt(interaction.fields.getTextInputValue(`offer_qty_${index}`) || '1');
-        return { name: item, quantity: Math.max(1, qty) };
+        const qty = Math.max(1, quantities[index]);
+        return { name: item, quantity: qty };
       });
 
       // Store in user's session
