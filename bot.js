@@ -6,6 +6,42 @@ const config = require('./config.json');
 const fs = require('fs');
 const redis = require('redis');
 
+// Function to increment version automatically
+function incrementVersion(currentVersion) {
+  const parts = currentVersion.split('.').map(Number);
+  if (parts.length !== 3) return '1.0.0';
+  
+  let [major, minor, patch] = parts;
+  
+  if (patch < 9) {
+    patch++;
+  } else {
+    patch = 0;
+    if (minor < 9) {
+      minor++;
+    } else {
+      minor = 0;
+      major++;
+    }
+  }
+  
+  return `${major}.${minor}.${patch}`;
+}
+
+// Function to update version file
+function updateVersionFile(category, newVersion) {
+  try {
+    const versionFile = require('./version.json');
+    versionFile[category] = newVersion;
+    versionFile.lastUpdated = new Date().toISOString();
+    fs.writeFileSync('./version.json', JSON.stringify(versionFile, null, 2));
+    return true;
+  } catch (error) {
+    console.error('Error updating version file:', error);
+    return false;
+  }
+}
+
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
 
 // Redis client
@@ -684,11 +720,14 @@ client.on('interactionCreate', async (interaction) => {
       const hasAdminRole = interaction.member.roles.cache.some(role => adminRoles.includes(role.id));
       if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
 
+      const versionFile = require('./version.json');
+      const version = versionFile.auction || '1.0.0';
+
       const embed = new EmbedBuilder()
         .setTitle('Auction System Setup')
         .setDescription('Welcome to the live auction system!\n\n**How it works:**\n- Auctions are held per channel to avoid conflicts.\n- Bidding can be done via text (e.g., "bid 10000") or slash commands.\n- The auction ends automatically after the set time, or can be ended early.\n- Winner is the highest bidder (diamonds first, then first bid if tie).\n\nClick the button below to create a new auction.')
         .setColor(0x00ff00)
-        .setFooter({ text: 'Version 1.0.9 | Made By Atlas' })
+        .setFooter({ text: `Version ${version} | Made By Atlas` })
         .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
       const row = new ActionRowBuilder()
@@ -712,8 +751,33 @@ client.on('interactionCreate', async (interaction) => {
 
         const versionFile = require('./version.json');
 
-        // Define embeds to update with their respective version keys
+        // Increment versions automatically for all categories
         const categoriesToUpdate = [
+          { key: 'auction', name: 'Auction' },
+          { key: 'trade', name: 'Trade' },
+          { key: 'inventory', name: 'Inventory' },
+          { key: 'giveaway', name: 'Giveaway' }
+        ];
+
+        let versionChanges = [];
+
+        for (const category of categoriesToUpdate) {
+          const currentVersion = versionFile[category.key] || '1.0.0';
+          const newVersion = incrementVersion(currentVersion);
+          
+          if (updateVersionFile(category.key, newVersion)) {
+            versionChanges.push(`${category.name}: ${currentVersion} → ${newVersion}`);
+          } else {
+            versionChanges.push(`${category.name}: Failed to update version`);
+          }
+        }
+
+        // Reload version file after updates
+        delete require.cache[require.resolve('./version.json')];
+        const updatedVersionFile = require('./version.json');
+
+        // Define embeds to update with their respective version keys
+        const categoriesToUpdateEmbeds = [
           {
             title: 'Auction System Setup',
             color: 0x00ff00,
@@ -741,8 +805,8 @@ client.on('interactionCreate', async (interaction) => {
           {
             title: '🎁 Giveaway System Setup',
             color: 0xFF1493,
-            description: 'Welcome to the giveaway system!\n\n**How it works:**\n- Create a giveaway with items you want to give away.\n- Set a duration for the giveaway.\n- Other users can enter the giveaway.\n- When the time expires, a random winner is selected.\n- Upload proof of completion when the giveaway ends.\n\nClick the button below to create a new giveaway.',
-            customId: 'giveaway_setup_start',
+            description: 'Welcome to the giveaway system!\n\n**How it works:**\n- Create a giveaway with items you want to give away.\n- Users can enter the giveaway by clicking the button.\n- Winners are selected randomly from all entries.\n- The role <@&1462168024151883836> will be mentioned when the giveaway starts!\n\nClick the button below to create a new giveaway.',
+            customId: 'create_giveaway',
             buttonLabel: 'Create Giveaway',
             versionKey: 'giveaway'
           }
@@ -751,10 +815,10 @@ client.on('interactionCreate', async (interaction) => {
         let updatedCount = 0;
         let failedCount = 0;
 
-        for (const category of categoriesToUpdate) {
+        for (const category of categoriesToUpdateEmbeds) {
           try {
-            // Get version from version.json for this category
-            const version = versionFile[category.versionKey] || '1.0.0';
+            // Get updated version from version.json for this category
+            const version = updatedVersionFile[category.versionKey] || '1.0.0';
 
             // Search for messages with this embed title in all channels
             const channels = interaction.guild.channels.cache.filter(c => c.isTextBased());
@@ -800,10 +864,10 @@ client.on('interactionCreate', async (interaction) => {
         }
 
         const updateEmbed = new EmbedBuilder()
-          .setTitle('✅ Embeds Updated')
-          .setDescription(`**Update Summary:**\n- ✅ Successfully updated: ${updatedCount} embed(s)\n- ❌ Failed: ${failedCount} embed(s)\n\n**Versions Applied:**\n- 🎪 Auction: v${versionFile.auction || '1.0.0'}\n- 🔄 Trade: v${versionFile.trade || '1.0.0'}\n- 📦 Inventory: v${versionFile.inventory || '1.0.0'}`)
+          .setTitle('✅ Embeds Updated with New Versions')
+          .setDescription(`**Update Summary:**\n- ✅ Successfully updated: ${updatedCount} embed(s)\n- ❌ Failed: ${failedCount} embed(s)\n\n**Version Changes:**\n${versionChanges.map(change => `- ${change}`).join('\n')}\n\n**Current Versions:**\n- 🎪 Auction: v${updatedVersionFile.auction || '1.0.0'}\n- 🔄 Trade: v${updatedVersionFile.trade || '1.0.0'}\n- 📦 Inventory: v${updatedVersionFile.inventory || '1.0.0'}\n- 🎁 Giveaway: v${updatedVersionFile.giveaway || '1.0.0'}`)
           .setColor(0x00ff00)
-          .setFooter({ text: `Last Updated: ${versionFile.lastUpdated || new Date().toISOString()} | Made By Atlas` });
+          .setFooter({ text: `Last Updated: ${updatedVersionFile.lastUpdated || new Date().toISOString()} | Made By Atlas` });
 
         await interaction.editReply({ embeds: [updateEmbed] });
       } catch (error) {
@@ -984,11 +1048,14 @@ client.on('interactionCreate', async (interaction) => {
         });
       }
 
+      const versionFile = require('./version.json');
+      const version = versionFile.trade || '1.0.0';
+
       const embed = new EmbedBuilder()
         .setTitle('Trade System Setup')
         .setDescription('Welcome to the live trade system!\n\n**How it works:**\n- Create a trade offer with items or diamonds.\n- Other users can place their offers in response.\n- Host can accept or decline offers.\n- Once accepted, both users are notified.\n\nClick the button below to create a new trade.')
         .setColor(0x0099ff)
-        .setFooter({ text: 'Version 1.0.9 | Made By Atlas' })
+        .setFooter({ text: `Version ${version} | Made By Atlas` })
         .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
       const row = new ActionRowBuilder()
@@ -1063,11 +1130,14 @@ client.on('interactionCreate', async (interaction) => {
       const hasAdminRole = interaction.member.roles.cache.some(role => adminRoles.includes(role.id));
       if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
 
+      const versionFile = require('./version.json');
+      const version = versionFile.inventory || '1.0.0';
+
       const embed = new EmbedBuilder()
         .setTitle('📦 Inventory System Setup')
         .setDescription('Welcome to the inventory system!\n\n**How it works:**\n- Create your personal inventory with items you have in stock.\n- Set your diamond amount and describe what you\'re looking for.\n- Optionally add your Roblox username to display your avatar.\n- Other users can see your inventory and make offers!\n- Update anytime - your previous items stay saved if you don\'t remove them.\n\nClick the button below to create or edit your inventory.')
         .setColor(0x00a8ff)
-        .setFooter({ text: 'Version 1.0.8 | Made By Atlas' })
+        .setFooter({ text: `Version ${version} | Made By Atlas` })
         .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
       const row = new ActionRowBuilder()
@@ -1086,11 +1156,14 @@ client.on('interactionCreate', async (interaction) => {
       const hasAdminRole = interaction.member.roles.cache.some(role => adminRoles.includes(role.id));
       if (!hasAdminRole) return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
 
+      const versionFile = require('./version.json');
+      const version = versionFile.giveaway || '1.0.0';
+
       const embed = new EmbedBuilder()
         .setTitle('🎁 Giveaway System Setup')
         .setDescription('Welcome to the giveaway system!\n\n**How it works:**\n- Create a giveaway with items you want to give away.\n- Users can enter the giveaway by clicking the button.\n- Winners are selected randomly from all entries.\n- The role <@&1462168024151883836> will be mentioned when the giveaway starts!\n\nClick the button below to create a new giveaway.')
         .setColor(0xFF1493)
-        .setFooter({ text: 'Version 1.0.9 | Made By Atlas' })
+        .setFooter({ text: `Version ${version} | Made By Atlas` })
         .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
       const row = new ActionRowBuilder()
