@@ -1158,6 +1158,7 @@ client.on('interactionCreate', async (interaction) => {
           color: 0xffa500,
           fields: [
             { name: '/update', value: 'Update auction, trade, and inventory embeds (admin only)', inline: false },
+            { name: '/savedata', value: 'Manually save all bot data to Redis (admin only)', inline: false },
             { name: '/botcmds', value: 'View all available bot commands', inline: false }
           ]
         }
@@ -1256,6 +1257,7 @@ client.on('interactionCreate', async (interaction) => {
           color: 0xffa500,
           fields: [
             { name: '/update', value: 'Update auction, trade, and inventory embeds (admin only)', inline: false },
+            { name: '/savedata', value: 'Manually save all bot data to Redis (admin only)', inline: false },
             { name: '/botcmds', value: 'View all available bot commands', inline: false }
           ]
         }
