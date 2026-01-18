@@ -2533,7 +2533,7 @@ client.on('interactionCreate', async (interaction) => {
         .setCustomId('offer_quantities')
         .setLabel(`Quantities for ${limitedItems.length} items (comma separated)`)
         .setStyle(TextInputStyle.Paragraph)
-        .setPlaceholder('1,2,3,... (one per item)')
+        .setPlaceholder('1,1,1,... (one per item)')
         .setRequired(true);
 
       const row = new ActionRowBuilder().addComponents(quantitiesInput);
