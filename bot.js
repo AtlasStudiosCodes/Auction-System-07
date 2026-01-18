@@ -1789,6 +1789,54 @@ client.on('interactionCreate', async (interaction) => {
       const row = new ActionRowBuilder().addComponents(categorySelect);
       await interaction.reply({ content: 'Select an item category to add to your inventory:', components: [row], ephemeral: true });
     }
+
+    if (interaction.customId === 'inventory_delete_button') {
+      const inventory = inventories.get(interaction.user.id);
+      if (!inventory || !inventory.items || inventory.items.length === 0) {
+        return interaction.reply({ content: 'You have no items to delete.', ephemeral: true });
+      }
+
+      const { StringSelectMenuBuilder } = require('discord.js');
+      
+      const deleteSelect = new StringSelectMenuBuilder()
+        .setCustomId('inventory_delete_select')
+        .setPlaceholder('Select items to delete')
+        .setMinValues(1)
+        .setMaxValues(Math.min(25, inventory.items.length));
+
+      inventory.items.forEach((item, index) => {
+        const emoji = getItemEmoji(item.name);
+        deleteSelect.addOptions({
+          label: `${formatItemName(item.name)} (x${item.quantity})`,
+          value: `${index}`,
+          emoji: emoji || '📦'
+        });
+      });
+
+      const row = new ActionRowBuilder().addComponents(deleteSelect);
+      await interaction.reply({ content: 'Select items to delete from your inventory:', components: [row], ephemeral: true });
+    }
+
+    if (interaction.customId === 'inventory_delete_select') {
+      const inventory = inventories.get(interaction.user.id);
+      if (!inventory) {
+        return interaction.reply({ content: 'Inventory not found.', ephemeral: true });
+      }
+
+      const indicesToDelete = interaction.values.map(v => parseInt(v)).sort((a, b) => b - a);
+      
+      indicesToDelete.forEach(index => {
+        if (index >= 0 && index < inventory.items.length) {
+          inventory.items.splice(index, 1);
+        }
+      });
+
+      if (inventory.items.length === 0) {
+        interaction.reply({ content: 'All items deleted from your inventory!', ephemeral: true });
+      } else {
+        interaction.reply({ content: `${indicesToDelete.length} item(s) deleted from your inventory!`, ephemeral: true });
+      }
+    }
   }
 
   if (interaction.isStringSelectMenu()) {
@@ -2958,7 +3006,7 @@ client.on('interactionCreate', async (interaction) => {
     .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
   // CONFIGURAÇÃO DO AUTHOR (Avatar do Roblox)
-  if (robloxId) {
+  if (robloxId && robloxId !== 'null' && robloxId !== '') {
     // Link que redireciona diretamente para a imagem PNG do busto do avatar
     const avatarUrl = `https://www.roblox.com/headshot-thumbnail/image?userId=${robloxId}&width=420&height=420&format=png`;
     
@@ -2993,7 +3041,12 @@ client.on('interactionCreate', async (interaction) => {
     .setLabel('Update Inventory')
     .setStyle(ButtonStyle.Primary);
 
-  const row = new ActionRowBuilder().addComponents(updateButton);
+  const deleteButton = new ButtonBuilder()
+    .setCustomId('inventory_delete_button')
+    .setLabel('Delete Items')
+    .setStyle(ButtonStyle.Danger);
+
+  const row = new ActionRowBuilder().addComponents(updateButton, deleteButton);
   const targetChannel = redirectInventoryChannelId ? interaction.guild.channels.cache.get(redirectInventoryChannelId) : interaction.channel;
   const message = await targetChannel.send({ embeds: [embed], components: [row] });
 
