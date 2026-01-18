@@ -3009,7 +3009,8 @@ client.on('interactionCreate', async (interaction) => {
   // CONFIGURAÇÃO DO AUTHOR (Avatar do Roblox)
   if (robloxId && robloxId !== 'null' && robloxId !== '' && !isNaN(robloxId)) {
     // Link que redireciona diretamente para a imagem PNG do busto do avatar
-    const avatarUrl = `https://www.roblox.com/headshot-thumbnail/image?userId=${robloxId}&width=420&height=420&format=png`;
+    // Usando o endpoint correto da Roblox: headshot-thumbnail.roblox.com
+    const avatarUrl = `https://headshot-thumbnail.roblox.com/v1/avatar-headshot?userIds=${robloxId}&width=420&height=420&format=png`;
     
     console.log(`Loading Roblox avatar for user ${interaction.user.username} with ID ${robloxId}: ${avatarUrl}`);
     
