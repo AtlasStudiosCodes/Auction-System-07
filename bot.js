@@ -2501,7 +2501,7 @@ client.on('interactionCreate', async (interaction) => {
         .setTitle('Select Quantities');
 
       let inputs = [];
-      selectedItems.slice(0, 5).forEach((item, index) => {
+      selectedItems.forEach((item, index) => {
         const input = new TextInputBuilder()
           .setCustomId(`inv_qty_${index}`)
           .setLabel(`${item} quantity`)
