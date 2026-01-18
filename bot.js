@@ -2534,7 +2534,40 @@ client.on('interactionCreate', async (interaction) => {
         await interaction.reply({ content: 'Select another item category:', components: [row], flags: 64 });
       } else if (choice === 'confirm_items') {
         // Check if diamonds are already added
-        const hasDiamonds = (interaction.user.offerTradeItems || []).some(item => item.name === '💎 Diamonds');
+        const offerItems = interaction.user.offerTradeItems || [];
+        const hasDiamonds = offerItems.some(item => item.name === '💎 Diamonds');
+        const onlyDiamonds = offerItems.length > 0 && offerItems.every(item => item.name === '💎 Diamonds');
+        
+        // If offer contains only diamonds, submit directly without modal
+        if (onlyDiamonds) {
+          const trade = trades.get(messageId);
+          if (!trade) return interaction.reply({ content: 'Trade not found.', flags: 64 });
+
+          // Check if user is the trade host
+          if (trade.host.id === interaction.user.id) {
+            return interaction.reply({ content: '❌ You cannot make an offer on your own trade!', flags: 64 });
+          }
+
+          // Add offer to trade
+          trade.offers.push({
+            user: interaction.user,
+            diamonds: offerItems.reduce((sum, item) => sum + item.quantity, 0),
+            items: [],
+            timestamp: Date.now()
+          });
+
+          // Update trade embed to show grid layout
+          await updateTradeEmbed(interaction.guild, trade, messageId);
+
+          // Notify host of new offer
+          const channel = interaction.guild.channels.cache.get(trade.channelId);
+          if (channel) {
+            await channel.send(`📢 <@${trade.host.id}>, you received an offer from <@${interaction.user.id}>!`);
+          }
+
+          await interaction.reply({ content: `Offer submitted! Host will accept or decline.`, flags: 64 });
+          return;
+        }
         
         // Move to diamonds and submit
         const diamondsModal = new ModalBuilder()
@@ -2555,7 +2588,7 @@ client.on('interactionCreate', async (interaction) => {
         }
         
         // Store items in interaction metadata
-        interaction.user.offerItems = interaction.user.offerTradeItems || [];
+        interaction.user.offerItems = offerItems;
         interaction.user.messageId = messageId;
         delete interaction.user.offerTradeItems;
         delete interaction.user.selectedOfferItems;
@@ -3120,7 +3153,13 @@ client.on('interactionCreate', async (interaction) => {
         interaction.user.tradeItems = [];
       }
 
-      interaction.user.tradeItems.push({ name: `💎 Diamonds`, quantity: diamonds });
+      // Check if diamonds already exist, if so replace quantity instead of adding
+      const existingDiamondsIndex = interaction.user.tradeItems.findIndex(item => item.name === '💎 Diamonds');
+      if (existingDiamondsIndex !== -1) {
+        interaction.user.tradeItems[existingDiamondsIndex].quantity = diamonds;
+      } else {
+        interaction.user.tradeItems.push({ name: `💎 Diamonds`, quantity: diamonds });
+      }
 
       const { StringSelectMenuBuilder } = require('discord.js');
       
@@ -3187,7 +3226,13 @@ client.on('interactionCreate', async (interaction) => {
         interaction.user.offerTradeItems = [];
       }
 
-      interaction.user.offerTradeItems.push({ name: `💎 Diamonds`, quantity: diamonds });
+      // Check if diamonds already exist, if so replace quantity instead of adding
+      const existingDiamondsIndex = interaction.user.offerTradeItems.findIndex(item => item.name === '💎 Diamonds');
+      if (existingDiamondsIndex !== -1) {
+        interaction.user.offerTradeItems[existingDiamondsIndex].quantity = diamonds;
+      } else {
+        interaction.user.offerTradeItems.push({ name: `💎 Diamonds`, quantity: diamonds });
+      }
 
       const { StringSelectMenuBuilder } = require('discord.js');
       
@@ -3220,7 +3265,13 @@ client.on('interactionCreate', async (interaction) => {
         interaction.user.inventoryItems = [];
       }
 
-      interaction.user.inventoryItems.push({ name: `💎 Diamonds`, quantity: diamonds });
+      // Check if diamonds already exist, if so replace quantity instead of adding
+      const existingDiamondsIndex = interaction.user.inventoryItems.findIndex(item => item.name === '💎 Diamonds');
+      if (existingDiamondsIndex !== -1) {
+        interaction.user.inventoryItems[existingDiamondsIndex].quantity = diamonds;
+      } else {
+        interaction.user.inventoryItems.push({ name: `💎 Diamonds`, quantity: diamonds });
+      }
 
       const { StringSelectMenuBuilder } = require('discord.js');
       
@@ -4181,7 +4232,13 @@ async function getRobloxAvatarUrl(userId) {
         interaction.user.giveawayItems = [];
       }
       
-      interaction.user.giveawayItems.push({ name: '💎 Diamonds', quantity: diamonds });
+      // Check if diamonds already exist, if so replace quantity instead of adding
+      const existingDiamondsIndex = interaction.user.giveawayItems.findIndex(item => item.name === '💎 Diamonds');
+      if (existingDiamondsIndex !== -1) {
+        interaction.user.giveawayItems[existingDiamondsIndex].quantity = diamonds;
+      } else {
+        interaction.user.giveawayItems.push({ name: '💎 Diamonds', quantity: diamonds });
+      }
 
       // Show continue select
       const { StringSelectMenuBuilder } = require('discord.js');
@@ -4239,7 +4296,7 @@ async function updateTradeEmbed(guild, trade, messageId) {
 
     const hostItemsText = formatItemsText(trade.hostItems);
     embed.addFields({
-      name: `Host${trade.hostDiamonds > 0 ? ` (+ ${trade.hostDiamonds} 💎)` : ''}`,
+      name: `Host${trade.hostDiamonds > 0 ? ` (+ ${formatBid(trade.hostDiamonds)} 💎)` : ''}`,
       value: hostItemsText,
       inline: true
     });
@@ -4248,7 +4305,7 @@ async function updateTradeEmbed(guild, trade, messageId) {
       const lastOffer = trade.offers[trade.offers.length - 1];
       const guestItemsText = formatItemsText(lastOffer.items);
       embed.addFields({
-        name: `${lastOffer.user.displayName || lastOffer.user.username}${lastOffer.diamonds > 0 ? ` (+ ${lastOffer.diamonds} 💎)` : ''}`,
+        name: `${lastOffer.user.displayName || lastOffer.user.username}${lastOffer.diamonds > 0 ? ` (+ ${formatBid(lastOffer.diamonds)} 💎)` : ''}`,
         value: guestItemsText,
         inline: true
       });
@@ -4257,7 +4314,7 @@ async function updateTradeEmbed(guild, trade, messageId) {
       if (acceptedOffer) {
         const guestItemsText = formatItemsText(acceptedOffer.items);
         embed.addFields({
-          name: `${acceptedOffer.user.displayName || acceptedOffer.user.username}${acceptedOffer.diamonds > 0 ? ` (+ ${acceptedOffer.diamonds} 💎)` : ''}`,
+          name: `${acceptedOffer.user.displayName || acceptedOffer.user.username}${acceptedOffer.diamonds > 0 ? ` (+ ${formatBid(acceptedOffer.diamonds)} 💎)` : ''}`,
           value: guestItemsText,
           inline: true
         });
