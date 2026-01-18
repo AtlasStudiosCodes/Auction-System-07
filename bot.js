@@ -107,6 +107,7 @@ const itemEmojis = {
   'HugeRainbowPropellerCat': '📦',
   'HugePropellerDog': '<:HugePropellerDog:1462185444837036105>',
   'HugeGoldenPropellerDog': '<:HugeGoldenPropellerDog:1462185464680157367>',
+  'HugeRainbowPropellerDog': '📦',
   'HugeDominusAzureus': '<:HugeDominusAzureus:1462106645466185833>',
   'HugeGoldenDominusAzureus': '<:HugeGoldenDominusAzureus:1462114314390343760>',
   'HugeFantasyChestMimic': '<:HugeFantasyChestMimic:1462166275685093553>',
