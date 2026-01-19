@@ -176,6 +176,7 @@ async function logError(interaction, errorCode, errorMessage, context = {}) {
     const embed = new EmbedBuilder()
       .setColor('#FF0000')
       .setTitle('⚠️ Error Report')
+      .setImage('https://media.discordapp.net/attachments/1461506733833846958/1462838334207557693/75e6b309-4e2b-48c6-9046-23df37b6c836.gif?ex=696fa5dd&is=696e545d&hm=00a95ab257adb2f266094f7f1eeae4f094c01d1f564402575b0897947601635b&=&width=1006&height=1006')
       .setThumbnail('https://media.discordapp.net/attachments/1461506733833846958/1462838334207557693/75e6b309-4e2b-48c6-9046-23df37b6c836.gif?ex=696fa5dd&is=696e545d&hm=00a95ab257adb2f266094f7f1eeae4f094c01d1f564402575b0897947601635b&=&width=1006&height=1006')
       .addFields(
         { name: 'User', value: `${userMention(interaction.user.id)} (${interaction.user.id})`, inline: true },
