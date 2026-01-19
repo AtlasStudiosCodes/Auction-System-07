@@ -63,7 +63,7 @@ const ERROR_CODES = {
   'E05': 'Only administrators can use this command',
   
   // Trade errors (06-20)
-  'E06': 'You cannot create a trade with more than 100 items',
+  'E06': 'You cannot create a trade with more than 25 items',
   'E07': 'No trade found with that ID',
   'E08': 'Trade already accepted by another user',
   'E09': 'Invalid trade offer',
@@ -471,6 +471,25 @@ function paginateItems(items, itemsPerPage = 15) {
     pages.push({
       items: pageItems,
       text: text,
+      page: pages.length + 1,
+      totalPages: Math.ceil(items.length / itemsPerPage)
+    });
+  }
+
+  return pages;
+}
+
+// Helper function to paginate items for select menus (25 max per select menu)
+function paginateSelectMenuItems(items, itemsPerPage = 25) {
+  if (!items || items.length === 0) {
+    return [];
+  }
+
+  const pages = [];
+  for (let i = 0; i < items.length; i += itemsPerPage) {
+    const pageItems = items.slice(i, i + itemsPerPage);
+    pages.push({
+      items: pageItems,
       page: pages.length + 1,
       totalPages: Math.ceil(items.length / itemsPerPage)
     });
@@ -2781,19 +2800,39 @@ client.on('interactionCreate', async (interaction) => {
         items = itemCategories[category];
       }
       
-      // Para outras categorias
-      const itemSelect = new StringSelectMenuBuilder()
-        .setCustomId(`trade_item_select_${category}`)
-        .setPlaceholder(`Select items from ${category}`)
-        .setMaxValues(Math.min(items.length, 100))
-        .addOptions(items.map(item => ({ 
-          label: formatItemName(item), 
-          value: item,
-          emoji: getItemEmoji(item)
-        })));
+      // Para outras categorias - paginar se necessário (max 25 options por select menu)
+      if (items.length > 25) {
+        const pages = paginateSelectMenuItems(items, 25);
+        const rows = [];
+        
+        for (const page of pages) {
+          const itemSelect = new StringSelectMenuBuilder()
+            .setCustomId(`trade_item_select_${category}_page${page.page}`)
+            .setPlaceholder(`Select items from ${category} (Page ${page.page}/${page.totalPages})`)
+            .setMaxValues(Math.min(page.items.length, 100))
+            .addOptions(page.items.map(item => ({ 
+              label: formatItemName(item), 
+              value: item,
+              emoji: getItemEmoji(item)
+            })));
+          rows.push(new ActionRowBuilder().addComponents(itemSelect));
+        }
+        
+        await interaction.reply({ content: `Select items from **${category}** category (${items.length} total items, split into pages):`, components: rows, flags: 64 });
+      } else {
+        const itemSelect = new StringSelectMenuBuilder()
+          .setCustomId(`trade_item_select_${category}`)
+          .setPlaceholder(`Select items from ${category}`)
+          .setMaxValues(Math.min(items.length, 100))
+          .addOptions(items.map(item => ({ 
+            label: formatItemName(item), 
+            value: item,
+            emoji: getItemEmoji(item)
+          })));
 
-      const row = new ActionRowBuilder().addComponents(itemSelect);
-      await interaction.reply({ content: `Select items from **${category}** category:`, components: [row], flags: 64 });
+        const row = new ActionRowBuilder().addComponents(itemSelect);
+        await interaction.reply({ content: `Select items from **${category}** category:`, components: [row], flags: 64 });
+      }
     }
 
     if (interaction.customId === 'trade_huge_subcategory_select') {
@@ -2801,29 +2840,90 @@ client.on('interactionCreate', async (interaction) => {
       const { StringSelectMenuBuilder } = require('discord.js');
       
       const items = itemCategories.huges[subcategory];
-      const itemSelect = new StringSelectMenuBuilder()
-        .setCustomId(`trade_item_select_huges_${subcategory}`)
-        .setPlaceholder(`Select items from ${subcategory}`)
-        .setMaxValues(Math.min(items.length, 100))
-        .addOptions(items.map(item => ({ 
-          label: formatItemName(item), 
-          value: item,
-          emoji: getItemEmoji(item)
-        })));
+      
+      // Paginar se necessário (max 25 options por select menu)
+      if (items.length > 25) {
+        const pages = paginateSelectMenuItems(items, 25);
+        const rows = [];
+        
+        for (const page of pages) {
+          const itemSelect = new StringSelectMenuBuilder()
+            .setCustomId(`trade_item_select_huges_${subcategory}_page${page.page}`)
+            .setPlaceholder(`Select ${subcategory} (Page ${page.page}/${page.totalPages})`)
+            .setMaxValues(Math.min(page.items.length, 100))
+            .addOptions(page.items.map(item => ({ 
+              label: formatItemName(item), 
+              value: item,
+              emoji: getItemEmoji(item)
+            })));
+          rows.push(new ActionRowBuilder().addComponents(itemSelect));
+        }
+        
+        await interaction.reply({ content: `Select items from **${subcategory}** (${items.length} total items):`, components: rows, flags: 64 });
+      } else {
+        const itemSelect = new StringSelectMenuBuilder()
+          .setCustomId(`trade_item_select_huges_${subcategory}`)
+          .setPlaceholder(`Select items from ${subcategory}`)
+          .setMaxValues(Math.min(items.length, 100))
+          .addOptions(items.map(item => ({ 
+            label: formatItemName(item), 
+            value: item,
+            emoji: getItemEmoji(item)
+          })));
 
-      const row = new ActionRowBuilder().addComponents(itemSelect);
-      await interaction.reply({ content: `Select items from **${subcategory}**:`, components: [row], flags: 64 });
+        const row = new ActionRowBuilder().addComponents(itemSelect);
+        await interaction.reply({ content: `Select items from **${subcategory}**:`, components: [row], flags: 64 });
+      }
     }
 
     if (interaction.customId.startsWith('trade_item_select_')) {
       const parts = interaction.customId.replace('trade_item_select_', '').split('_');
       let category = parts[0];
-      let subcategory = parts.length > 1 ? parts.slice(1).join('_') : null;
+      let subcategory = null;
+      let isPagedSelect = false;
+      
+      // Detectar se é uma página de seleção com paginação
+      const pageMatch = interaction.customId.match(/page(\d+)$/);
+      if (pageMatch) {
+        isPagedSelect = true;
+        // Re-parse para encontrar a subcategoria corretamente
+        const withoutPage = interaction.customId.replace(/_page\d+$/, '').replace('trade_item_select_', '');
+        const subparts = withoutPage.split('_');
+        if (withoutPage.startsWith('huges_')) {
+          category = 'huges';
+          subcategory = subparts.slice(1).join('_');
+        } else {
+          category = subparts[0];
+          subcategory = subparts.length > 1 ? subparts.slice(1).join('_') : null;
+        }
+      } else {
+        // Parse normal
+        if (parts.length > 1 && parts[0] === 'huges') {
+          category = 'huges';
+          subcategory = parts.slice(1).join('_');
+        } else {
+          subcategory = parts.length > 1 ? parts.slice(1).join('_') : null;
+        }
+      }
       
       const selectedItems = interaction.values;
 
-      // Store items selection - no longer limited to 25
-      interaction.user.selectedTradeItems = selectedItems;
+      // Se for paginado, acumular seleções
+      if (isPagedSelect) {
+        if (!interaction.user.selectedTradeItems) {
+          interaction.user.selectedTradeItems = [];
+        }
+        // Adicionar novos itens (evitar duplicatas)
+        selectedItems.forEach(item => {
+          if (!interaction.user.selectedTradeItems.includes(item)) {
+            interaction.user.selectedTradeItems.push(item);
+          }
+        });
+      } else {
+        // Store items selection - não limitado a 25
+        interaction.user.selectedTradeItems = selectedItems;
+      }
+
       interaction.user.selectedTradeCategory = category;
       interaction.user.selectedTradeSubcategory = subcategory;
 
@@ -2882,14 +2982,32 @@ client.on('interactionCreate', async (interaction) => {
       }
       
       const items = itemCategories[category];
-      const itemSelect = new StringSelectMenuBuilder()
-        .setCustomId(`offer_item_select_${messageId}_${category}`)
-        .setPlaceholder(`Select items from ${category}`)
-        .setMaxValues(Math.min(items.length, 100))
-        .addOptions(items.map(item => ({ label: item, value: item })));
+      
+      // Paginar se necessário (max 25 options por select menu)
+      if (items.length > 25) {
+        const pages = paginateSelectMenuItems(items, 25);
+        const rows = [];
+        
+        for (const page of pages) {
+          const itemSelect = new StringSelectMenuBuilder()
+            .setCustomId(`offer_item_select_${messageId}_${category}_page${page.page}`)
+            .setPlaceholder(`Select items from ${category} (Page ${page.page}/${page.totalPages})`)
+            .setMaxValues(Math.min(page.items.length, 100))
+            .addOptions(page.items.map(item => ({ label: item, value: item })));
+          rows.push(new ActionRowBuilder().addComponents(itemSelect));
+        }
+        
+        await interaction.reply({ content: `Select items from **${category}** category (${items.length} total items):`, components: rows, flags: 64 });
+      } else {
+        const itemSelect = new StringSelectMenuBuilder()
+          .setCustomId(`offer_item_select_${messageId}_${category}`)
+          .setPlaceholder(`Select items from ${category}`)
+          .setMaxValues(Math.min(items.length, 100))
+          .addOptions(items.map(item => ({ label: item, value: item })));
 
-      const row = new ActionRowBuilder().addComponents(itemSelect);
-      await interaction.reply({ content: `Select items from **${category}** category:`, components: [row], flags: 64 });
+        const row = new ActionRowBuilder().addComponents(itemSelect);
+        await interaction.reply({ content: `Select items from **${category}** category:`, components: [row], flags: 64 });
+      }
     }
 
     if (interaction.customId.startsWith('offer_huge_subcategory_select_')) {
@@ -2898,25 +3016,84 @@ client.on('interactionCreate', async (interaction) => {
       const { StringSelectMenuBuilder } = require('discord.js');
       
       const items = itemCategories.huges[subcategory];
-      const itemSelect = new StringSelectMenuBuilder()
-        .setCustomId(`offer_item_select_${messageId}_huges_${subcategory}`)
-        .setPlaceholder(`Select items from ${subcategory}`)
-        .setMaxValues(Math.min(items.length, 100))
-        .addOptions(items.map(item => ({ label: item, value: item })));
+      
+      // Paginar se necessário (max 25 options por select menu)
+      if (items.length > 25) {
+        const pages = paginateSelectMenuItems(items, 25);
+        const rows = [];
+        
+        for (const page of pages) {
+          const itemSelect = new StringSelectMenuBuilder()
+            .setCustomId(`offer_item_select_${messageId}_huges_${subcategory}_page${page.page}`)
+            .setPlaceholder(`Select ${subcategory} (Page ${page.page}/${page.totalPages})`)
+            .setMaxValues(Math.min(page.items.length, 100))
+            .addOptions(page.items.map(item => ({ label: item, value: item })));
+          rows.push(new ActionRowBuilder().addComponents(itemSelect));
+        }
+        
+        await interaction.reply({ content: `Select items from **${subcategory}** (${items.length} total items):`, components: rows, flags: 64 });
+      } else {
+        const itemSelect = new StringSelectMenuBuilder()
+          .setCustomId(`offer_item_select_${messageId}_huges_${subcategory}`)
+          .setPlaceholder(`Select items from ${subcategory}`)
+          .setMaxValues(Math.min(items.length, 100))
+          .addOptions(items.map(item => ({ label: item, value: item })));
 
-      const row = new ActionRowBuilder().addComponents(itemSelect);
-      await interaction.reply({ content: `Select items from **${subcategory}**:`, components: [row], flags: 64 });
+        const row = new ActionRowBuilder().addComponents(itemSelect);
+        await interaction.reply({ content: `Select items from **${subcategory}**:`, components: [row], flags: 64 });
+      }
     }
 
     if (interaction.customId.startsWith('offer_item_select_')) {
       const parts = interaction.customId.replace('offer_item_select_', '').split('_');
       const messageId = parts[0];
       let category = parts[1];
-      let subcategory = parts.length > 2 ? parts.slice(2).join('_') : null;
+      let subcategory = null;
+      let isPagedSelect = false;
+      
+      // Detectar se é uma página de seleção com paginação
+      const pageMatch = interaction.customId.match(/page(\d+)$/);
+      if (pageMatch) {
+        isPagedSelect = true;
+        // Re-parse para encontrar a subcategoria corretamente
+        const withoutPage = interaction.customId.replace(/_page\d+$/, '').replace('offer_item_select_', '');
+        const subparts = withoutPage.split('_');
+        messageId = subparts[0];
+        if (withoutPage.includes('_huges_')) {
+          category = 'huges';
+          subcategory = subparts.slice(2).join('_');
+        } else {
+          category = subparts[1];
+          subcategory = subparts.length > 2 ? subparts.slice(2).join('_') : null;
+        }
+      } else {
+        // Parse normal
+        if (parts.length > 2 && parts[1] === 'huges') {
+          category = 'huges';
+          subcategory = parts.slice(2).join('_');
+        } else {
+          subcategory = parts.length > 2 ? parts.slice(2).join('_') : null;
+        }
+      }
+      
       const selectedItems = interaction.values;
 
-      // Store items selection - no longer limited to 25
-      interaction.user.selectedOfferItems = selectedItems;
+      // Se for paginado, acumular seleções
+      if (isPagedSelect) {
+        if (!interaction.user.selectedOfferItems) {
+          interaction.user.selectedOfferItems = [];
+        }
+        // Adicionar novos itens (evitar duplicatas)
+        selectedItems.forEach(item => {
+          if (!interaction.user.selectedOfferItems.includes(item)) {
+            interaction.user.selectedOfferItems.push(item);
+          }
+        });
+      } else {
+        // Store items selection - não limitado a 25
+        interaction.user.selectedOfferItems = selectedItems;
+      }
+
       interaction.user.selectedOfferCategory = category;
       interaction.user.selectedOfferSubcategory = subcategory;
       interaction.user.selectedOfferMessageId = messageId;
@@ -2928,7 +3105,7 @@ client.on('interactionCreate', async (interaction) => {
 
       const quantitiesInput = new TextInputBuilder()
         .setCustomId('offer_quantities')
-        .setLabel(`Quantities for ${selectedItems.length} items (comma separated)`)
+        .setLabel(`Quantities for ${interaction.user.selectedOfferItems.length} items (comma separated)`)
         .setStyle(TextInputStyle.Paragraph)
         .setPlaceholder('1,2,3,... (one per item)')
         .setRequired(true);
@@ -3499,18 +3676,40 @@ client.on('interactionCreate', async (interaction) => {
       }
       
       const items = itemCategories[category];
-      const itemSelect = new StringSelectMenuBuilder()
-        .setCustomId(`inventory_item_select_${category}`)
-        .setPlaceholder(`Select items from ${category}`)
-        .setMaxValues(Math.min(items.length, 100))
-        .addOptions(items.map(item => ({ 
-          label: formatItemName(item), 
-          value: item,
-          emoji: getItemEmoji(item)
-        })));
+      
+      // Paginar se necessário (max 25 options por select menu)
+      if (items.length > 25) {
+        const pages = paginateSelectMenuItems(items, 25);
+        const rows = [];
+        
+        for (const page of pages) {
+          const itemSelect = new StringSelectMenuBuilder()
+            .setCustomId(`inventory_item_select_${category}_page${page.page}`)
+            .setPlaceholder(`Select items from ${category} (Page ${page.page}/${page.totalPages})`)
+            .setMaxValues(Math.min(page.items.length, 100))
+            .addOptions(page.items.map(item => ({ 
+              label: formatItemName(item), 
+              value: item,
+              emoji: getItemEmoji(item)
+            })));
+          rows.push(new ActionRowBuilder().addComponents(itemSelect));
+        }
+        
+        await interaction.reply({ content: `Select items from **${category}** category (${items.length} total items):`, components: rows, flags: 64 });
+      } else {
+        const itemSelect = new StringSelectMenuBuilder()
+          .setCustomId(`inventory_item_select_${category}`)
+          .setPlaceholder(`Select items from ${category}`)
+          .setMaxValues(Math.min(items.length, 100))
+          .addOptions(items.map(item => ({ 
+            label: formatItemName(item), 
+            value: item,
+            emoji: getItemEmoji(item)
+          })));
 
-      const row = new ActionRowBuilder().addComponents(itemSelect);
-      await interaction.reply({ content: `Select items from **${category}** category:`, components: [row], flags: 64 });
+        const row = new ActionRowBuilder().addComponents(itemSelect);
+        await interaction.reply({ content: `Select items from **${category}** category:`, components: [row], flags: 64 });
+      }
     }
 
     if (interaction.customId === 'inventory_huge_subcategory_select') {
@@ -3518,29 +3717,90 @@ client.on('interactionCreate', async (interaction) => {
       const { StringSelectMenuBuilder } = require('discord.js');
       
       const items = itemCategories.huges[subcategory];
-      const itemSelect = new StringSelectMenuBuilder()
-        .setCustomId(`inventory_item_select_huges_${subcategory}`)
-        .setPlaceholder(`Select items from ${subcategory}`)
-        .setMaxValues(Math.min(items.length, 100))
-        .addOptions(items.map(item => ({ 
-          label: formatItemName(item), 
-          value: item,
-          emoji: getItemEmoji(item)
-        })));
+      
+      // Paginar se necessário (max 25 options por select menu)
+      if (items.length > 25) {
+        const pages = paginateSelectMenuItems(items, 25);
+        const rows = [];
+        
+        for (const page of pages) {
+          const itemSelect = new StringSelectMenuBuilder()
+            .setCustomId(`inventory_item_select_huges_${subcategory}_page${page.page}`)
+            .setPlaceholder(`Select ${subcategory} (Page ${page.page}/${page.totalPages})`)
+            .setMaxValues(Math.min(page.items.length, 100))
+            .addOptions(page.items.map(item => ({ 
+              label: formatItemName(item), 
+              value: item,
+              emoji: getItemEmoji(item)
+            })));
+          rows.push(new ActionRowBuilder().addComponents(itemSelect));
+        }
+        
+        await interaction.reply({ content: `Select items from **${subcategory}** (${items.length} total items):`, components: rows, flags: 64 });
+      } else {
+        const itemSelect = new StringSelectMenuBuilder()
+          .setCustomId(`inventory_item_select_huges_${subcategory}`)
+          .setPlaceholder(`Select items from ${subcategory}`)
+          .setMaxValues(Math.min(items.length, 100))
+          .addOptions(items.map(item => ({ 
+            label: formatItemName(item), 
+            value: item,
+            emoji: getItemEmoji(item)
+          })));
 
-      const row = new ActionRowBuilder().addComponents(itemSelect);
-      await interaction.reply({ content: `Select items from **${subcategory}**:`, components: [row], flags: 64 });
+        const row = new ActionRowBuilder().addComponents(itemSelect);
+        await interaction.reply({ content: `Select items from **${subcategory}**:`, components: [row], flags: 64 });
+      }
     }
 
     if (interaction.customId.startsWith('inventory_item_select_')) {
       const parts = interaction.customId.replace('inventory_item_select_', '').split('_');
       let category = parts[0];
-      let subcategory = parts.length > 1 ? parts.slice(1).join('_') : null;
+      let subcategory = null;
+      let isPagedSelect = false;
+      
+      // Detectar se é uma página de seleção com paginação
+      const pageMatch = interaction.customId.match(/page(\d+)$/);
+      if (pageMatch) {
+        isPagedSelect = true;
+        // Re-parse para encontrar a subcategoria corretamente
+        const withoutPage = interaction.customId.replace(/_page\d+$/, '').replace('inventory_item_select_', '');
+        const subparts = withoutPage.split('_');
+        if (withoutPage.startsWith('huges_')) {
+          category = 'huges';
+          subcategory = subparts.slice(1).join('_');
+        } else {
+          category = subparts[0];
+          subcategory = subparts.length > 1 ? subparts.slice(1).join('_') : null;
+        }
+      } else {
+        // Parse normal
+        if (parts.length > 1 && parts[0] === 'huges') {
+          category = 'huges';
+          subcategory = parts.slice(1).join('_');
+        } else {
+          subcategory = parts.length > 1 ? parts.slice(1).join('_') : null;
+        }
+      }
       
       const selectedItems = interaction.values;
 
-      // Store items selection - no longer limited to 25
-      interaction.user.selectedInventoryItems = selectedItems;
+      // Se for paginado, acumular seleções
+      if (isPagedSelect) {
+        if (!interaction.user.selectedInventoryItems) {
+          interaction.user.selectedInventoryItems = [];
+        }
+        // Adicionar novos itens (evitar duplicatas)
+        selectedItems.forEach(item => {
+          if (!interaction.user.selectedInventoryItems.includes(item)) {
+            interaction.user.selectedInventoryItems.push(item);
+          }
+        });
+      } else {
+        // Store items selection - não limitado a 25
+        interaction.user.selectedInventoryItems = selectedItems;
+      }
+
       interaction.user.selectedInventoryCategory = category;
       interaction.user.selectedInventorySubcategory = subcategory;
 
@@ -3550,7 +3810,7 @@ client.on('interactionCreate', async (interaction) => {
 
       const quantitiesInput = new TextInputBuilder()
         .setCustomId('inv_quantities')
-        .setLabel(`Quantities for ${selectedItems.length} items (comma separated)`)
+        .setLabel(`Quantities for ${interaction.user.selectedInventoryItems.length} items (comma separated)`)
         .setStyle(TextInputStyle.Paragraph)
         .setPlaceholder('1,2,3,... (one per item)')
         .setRequired(true);
@@ -3599,18 +3859,40 @@ client.on('interactionCreate', async (interaction) => {
       }
       
       const items = giveawayItemCategories[category];
-      const itemSelect = new StringSelectMenuBuilder()
-        .setCustomId(`giveaway_item_select_${category}`)
-        .setPlaceholder(`Select items from ${category}`)
-        .setMaxValues(Math.min(items.length, 100))
-        .addOptions(items.map(item => ({ 
-          label: formatItemName(item), 
-          value: item,
-          emoji: getItemEmoji(item)
-        })));
+      
+      // Paginar se necessário (max 25 options por select menu)
+      if (items.length > 25) {
+        const pages = paginateSelectMenuItems(items, 25);
+        const rows = [];
+        
+        for (const page of pages) {
+          const itemSelect = new StringSelectMenuBuilder()
+            .setCustomId(`giveaway_item_select_${category}_page${page.page}`)
+            .setPlaceholder(`Select items from ${category} (Page ${page.page}/${page.totalPages})`)
+            .setMaxValues(Math.min(page.items.length, 100))
+            .addOptions(page.items.map(item => ({ 
+              label: formatItemName(item), 
+              value: item,
+              emoji: getItemEmoji(item)
+            })));
+          rows.push(new ActionRowBuilder().addComponents(itemSelect));
+        }
+        
+        await interaction.reply({ content: `Select items from **${category}** category (${items.length} total items):`, components: rows, flags: 64 });
+      } else {
+        const itemSelect = new StringSelectMenuBuilder()
+          .setCustomId(`giveaway_item_select_${category}`)
+          .setPlaceholder(`Select items from ${category}`)
+          .setMaxValues(Math.min(items.length, 100))
+          .addOptions(items.map(item => ({ 
+            label: formatItemName(item), 
+            value: item,
+            emoji: getItemEmoji(item)
+          })));
 
-      const row = new ActionRowBuilder().addComponents(itemSelect);
-      await interaction.reply({ content: `Select items from **${category}** category:`, components: [row], flags: 64 });
+        const row = new ActionRowBuilder().addComponents(itemSelect);
+        await interaction.reply({ content: `Select items from **${category}** category:`, components: [row], flags: 64 });
+      }
     }
 
     if (interaction.customId === 'giveaway_huge_subcategory_select') {
@@ -3618,29 +3900,90 @@ client.on('interactionCreate', async (interaction) => {
       const { StringSelectMenuBuilder } = require('discord.js');
       
       const items = giveawayItemCategories.huges[subcategory];
-      const itemSelect = new StringSelectMenuBuilder()
-        .setCustomId(`giveaway_item_select_huges_${subcategory}`)
-        .setPlaceholder(`Select items from ${subcategory}`)
-        .setMaxValues(Math.min(items.length, 100))
-        .addOptions(items.map(item => ({ 
-          label: formatItemName(item), 
-          value: item,
-          emoji: getItemEmoji(item)
-        })));
+      
+      // Paginar se necessário (max 25 options por select menu)
+      if (items.length > 25) {
+        const pages = paginateSelectMenuItems(items, 25);
+        const rows = [];
+        
+        for (const page of pages) {
+          const itemSelect = new StringSelectMenuBuilder()
+            .setCustomId(`giveaway_item_select_huges_${subcategory}_page${page.page}`)
+            .setPlaceholder(`Select ${subcategory} (Page ${page.page}/${page.totalPages})`)
+            .setMaxValues(Math.min(page.items.length, 100))
+            .addOptions(page.items.map(item => ({ 
+              label: formatItemName(item), 
+              value: item,
+              emoji: getItemEmoji(item)
+            })));
+          rows.push(new ActionRowBuilder().addComponents(itemSelect));
+        }
+        
+        await interaction.reply({ content: `Select items from **${subcategory}** (${items.length} total items):`, components: rows, flags: 64 });
+      } else {
+        const itemSelect = new StringSelectMenuBuilder()
+          .setCustomId(`giveaway_item_select_huges_${subcategory}`)
+          .setPlaceholder(`Select items from ${subcategory}`)
+          .setMaxValues(Math.min(items.length, 100))
+          .addOptions(items.map(item => ({ 
+            label: formatItemName(item), 
+            value: item,
+            emoji: getItemEmoji(item)
+          })));
 
-      const row = new ActionRowBuilder().addComponents(itemSelect);
-      await interaction.reply({ content: `Select items from **${subcategory}**:`, components: [row], flags: 64 });
+        const row = new ActionRowBuilder().addComponents(itemSelect);
+        await interaction.reply({ content: `Select items from **${subcategory}**:`, components: [row], flags: 64 });
+      }
     }
 
     if (interaction.customId.startsWith('giveaway_item_select_')) {
       const parts = interaction.customId.replace('giveaway_item_select_', '').split('_');
       let category = parts[0];
-      let subcategory = parts.length > 1 ? parts.slice(1).join('_') : null;
+      let subcategory = null;
+      let isPagedSelect = false;
+      
+      // Detectar se é uma página de seleção com paginação
+      const pageMatch = interaction.customId.match(/page(\d+)$/);
+      if (pageMatch) {
+        isPagedSelect = true;
+        // Re-parse para encontrar a subcategoria corretamente
+        const withoutPage = interaction.customId.replace(/_page\d+$/, '').replace('giveaway_item_select_', '');
+        const subparts = withoutPage.split('_');
+        if (withoutPage.startsWith('huges_')) {
+          category = 'huges';
+          subcategory = subparts.slice(1).join('_');
+        } else {
+          category = subparts[0];
+          subcategory = subparts.length > 1 ? subparts.slice(1).join('_') : null;
+        }
+      } else {
+        // Parse normal
+        if (parts.length > 1 && parts[0] === 'huges') {
+          category = 'huges';
+          subcategory = parts.slice(1).join('_');
+        } else {
+          subcategory = parts.length > 1 ? parts.slice(1).join('_') : null;
+        }
+      }
       
       const selectedItems = interaction.values;
 
-      // Store items selection - no longer limited to 25
-      interaction.user.selectedGiveawayItems = selectedItems;
+      // Se for paginado, acumular seleções
+      if (isPagedSelect) {
+        if (!interaction.user.selectedGiveawayItems) {
+          interaction.user.selectedGiveawayItems = [];
+        }
+        // Adicionar novos itens (evitar duplicatas)
+        selectedItems.forEach(item => {
+          if (!interaction.user.selectedGiveawayItems.includes(item)) {
+            interaction.user.selectedGiveawayItems.push(item);
+          }
+        });
+      } else {
+        // Store items selection - não limitado a 25
+        interaction.user.selectedGiveawayItems = selectedItems;
+      }
+
       interaction.user.selectedGiveawayCategory = category;
       interaction.user.selectedGiveawaySubcategory = subcategory;
 
