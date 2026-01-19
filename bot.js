@@ -1518,6 +1518,7 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   if (interaction.isButton()) {
+    if (!interaction.customId) return interaction.reply({ content: 'Invalid interaction. Report to Atlas please 👏', flags: MessageFlags.Ephemeral });
     // Handle botcmds pagination
     if (interaction.customId.startsWith('botcmds_')) {
       const pages = [
@@ -2474,6 +2475,7 @@ client.on('interactionCreate', async (interaction) => {
     }
 
   if (interaction.isStringSelectMenu()) {
+    if (!interaction.customId) return interaction.reply({ content: 'Invalid interaction. Report to Atlas please 👏', flags: MessageFlags.Ephemeral });
     if (interaction.customId === 'trade_category_select') {
       const category = interaction.values[0];
       const { StringSelectMenuBuilder } = require('discord.js');
@@ -3364,6 +3366,7 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   if (interaction.isModalSubmit()) {
+    if (!interaction.customId) return interaction.reply({ content: 'Invalid interaction. Report to Atlas please 👏', flags: MessageFlags.Ephemeral });
     if (interaction.customId === 'trade_diamonds_modal') {
       const diamondsStr = interaction.fields.getTextInputValue('diamonds_amount');
       const diamonds = parseBid(diamondsStr);
@@ -3636,6 +3639,7 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   if (interaction.isModalSubmit()) {
+    if (!interaction.customId) return interaction.reply({ content: 'Invalid interaction. Report to Atlas please 👏', flags: MessageFlags.Ephemeral });
     if (interaction.customId === 'inventory_item_quantities_modal') {
       const selectedItems = interaction.user.selectedInventoryItems || [];
       const category = interaction.user.selectedInventoryCategory;
