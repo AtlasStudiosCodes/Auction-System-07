@@ -1665,7 +1665,7 @@ client.on('interactionCreate', async (interaction) => {
         if (secondsAgo < 60) timeAgo = `${secondsAgo} seconds ago`;
         else if (secondsAgo < 3600) timeAgo = `${Math.floor(secondsAgo / 60)} minutes ago`;
         else timeAgo = `${Math.floor(secondsAgo / 3600)} hours ago`;
-        return `${bid.user.username}: ${bid.diamonds} 💎 - ${timeAgo}`;
+        return `${bid.user.username}: ${formatBid(bid.diamonds)} 💎 - ${timeAgo}`;
       }).join('\n');
 
       const embed = new EmbedBuilder()
@@ -4039,7 +4039,7 @@ async function getRobloxAvatarUrl(userId) {
       const hostItemsText = formatItemsText(hostItems);
       
       embed.addFields({
-        name: `Host Items${diamonds > 0 ? ` + ${diamonds} 💎` : ''}`,
+        name: `Host Items${diamonds > 0 ? ` + ${formatBid(diamonds)} 💎` : ''}`,
         value: hostItemsText,
         inline: false
       });
@@ -4152,10 +4152,10 @@ async function getRobloxAvatarUrl(userId) {
 
       // Check if bid is higher than current max
       const maxBid = auction.bids.length > 0 ? Math.max(...auction.bids.map(b => b.diamonds)) : auction.startingPrice;
-      if (auction.model !== 'items' && diamonds <= maxBid) return interaction.reply({ content: `Your bid must be higher than the current highest bid of ${maxBid} 💎.`, flags: MessageFlags.Ephemeral });
+      if (auction.model !== 'items' && diamonds <= maxBid) return interaction.reply({ content: `Your bid must be higher than the current highest bid of ${formatBid(maxBid)} 💎.`, flags: MessageFlags.Ephemeral });
 
       auction.bids.push({ user: interaction.user, diamonds, items, timestamp: Date.now() });
-      interaction.reply(`Bid placed: ${diamonds > 0 ? `${diamonds} 💎` : ''}${items ? ` and ${items}` : ''}`);
+      interaction.reply(`Bid placed: ${diamonds > 0 ? `${formatBid(diamonds)} 💎` : ''}${items ? ` and ${items}` : ''}`);
     }
 
     if (interaction.customId === 'auction_modal') {
