@@ -575,6 +575,47 @@ function paginateTradeItems(items, page = 1, itemsPerPage = 10) {
   };
 }
 
+// Function to detect and log when items are lost between selection and posting
+function validateItemsNotLost(interaction, operationType, expectedCount, actualItems) {
+  if (expectedCount > 0 && (!actualItems || actualItems.length === 0)) {
+    // Items were lost! Send critical log
+    const errorMessage = `🚨 **ITEM LOSS DETECTED** 🚨\n` +
+      `**User:** <@${interaction.user.id}> (${interaction.user.id})\n` +
+      `**Operation:** ${operationType}\n` +
+      `**Expected Items:** ${expectedCount}\n` +
+      `**Actual Items:** 0\n` +
+      `**Time:** <t:${Math.floor(Date.now() / 1000)}:F>\n` +
+      `**Guild:** ${interaction.guild?.name} (${interaction.guild?.id})\n` +
+      `**Channel:** ${interaction.channel?.name} (${interaction.channel?.id})\n` +
+      `\n**Possible Cause:** Items array was cleared or deleted before posting embed`;
+    
+    // Log to console with red color indicator
+    console.error(`\n❌ CRITICAL: Item Loss Detected for user ${interaction.user.id} in ${operationType}\n`);
+    console.error(`Expected: ${expectedCount}, Got: 0\n`);
+    
+    // Send to error log channel
+    const errorLogChannelId = '1462804742366298112';
+    const client = interaction.client;
+    if (client && errorLogChannelId) {
+      const errorLogChannel = client.channels.cache.get(errorLogChannelId);
+      if (errorLogChannel) {
+        const embed = new EmbedBuilder()
+          .setColor('#FF0000')
+          .setTitle('🚨 Critical: Item Loss Detected')
+          .setDescription(errorMessage)
+          .setFooter({ text: `Timestamp: ${Date.now()}` });
+        
+        errorLogChannel.send({ embeds: [embed] }).catch(err => {
+          console.error('Failed to send item loss log:', err);
+        });
+      }
+    }
+    
+    return false;
+  }
+  return true;
+}
+
 // Helper function to add fields safely to embed (prevents invalid fields)
 // Tracking for addFieldSafely errors
 const addFieldSafelyErrors = [];
@@ -4506,6 +4547,15 @@ client.on('interactionCreate', async (interaction) => {
 
   const inventoryItems = interaction.user.inventoryItems || [];
   
+  // Validate that items were not lost
+  const itemCountBeforeDeletion = inventoryItems.length;
+  validateItemsNotLost(interaction, 'Inventory Setup', itemCountBeforeDeletion, inventoryItems);
+
+  delete interaction.user.inventoryItems;
+  delete interaction.user.selectedInventoryItems;
+  delete interaction.user.selectedInventoryCategory;
+  delete interaction.user.selectedInventorySubcategory;
+  
   // Validate item count before finalizing
   const isValid = await validateItemCount(interaction, 'inventoryCount', inventoryItems.length, inventoryItems);
   if (!isValid) {
@@ -4709,6 +4759,10 @@ async function getRobloxAvatarUrl(userId) {
       const giveawayItems = interaction.user.giveawayItems || [];
       const description = interaction.fields.getTextInputValue('gwa_description') || '';
       const durationStr = interaction.fields.getTextInputValue('gwa_duration');
+      
+      // Validate that items were not lost
+      const itemCountBeforeDeletion = giveawayItems.length;
+      validateItemsNotLost(interaction, 'Giveaway Setup', itemCountBeforeDeletion, giveawayItems);
       
       // Validate item count before finalizing
       const isValid = await validateItemCount(interaction, 'giveawayCount', giveawayItems.length, giveawayItems);
@@ -4934,6 +4988,11 @@ async function getRobloxAvatarUrl(userId) {
       }
 
       const hostItems = interaction.user.tradeItems || [];
+      
+      // Validate that items were not lost (track item count before deletion)
+      const itemCountBeforeDeletion = hostItems.length;
+      validateItemsNotLost(interaction, 'Trade Offer Setup', itemCountBeforeDeletion, hostItems);
+      
       delete interaction.user.tradeItems;
       delete interaction.user.selectedTradeItems;
       delete interaction.user.selectedTradeCategory;
