@@ -443,6 +443,42 @@ function formatItemsList(items) {
   }).join('\n');
 }
 
+// Helper function to paginate items for embeds (15 items per page)
+function paginateItems(items, itemsPerPage = 15) {
+  if (!items || items.length === 0) {
+    return [{ items: [], text: 'None', page: 1, totalPages: 1 }];
+  }
+
+  const pages = [];
+  for (let i = 0; i < items.length; i += itemsPerPage) {
+    const pageItems = items.slice(i, i + itemsPerPage);
+    const text = pageItems.map(item => {
+      if (typeof item === 'object') {
+        if (item.name === '💎 Diamonds') {
+          const abbreviatedValue = formatBid(item.quantity);
+          return `💎 **Diamonds** (${abbreviatedValue} 💎)`;
+        }
+        const emoji = getItemEmoji(item.name) || '';
+        const formattedName = formatItemName(item.name);
+        return `${emoji} **${formattedName}** (x${item.quantity})`;
+      } else {
+        const emoji = getItemEmoji(item) || '';
+        const formattedName = formatItemName(item);
+        return `${emoji} **${formattedName}**`;
+      }
+    }).join('\n');
+
+    pages.push({
+      items: pageItems,
+      text: text,
+      page: pages.length + 1,
+      totalPages: Math.ceil(items.length / itemsPerPage)
+    });
+  }
+
+  return pages;
+}
+
 // Save data every 5 minutes and reload without losing active embeds
 setInterval(async () => {
   await saveAndReloadData();
@@ -4087,10 +4123,18 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   // Rest of embed filling...
-  const itemsText = formatItemsText(inventoryItems);
+  // Paginate inventory items (15 per page)
+  const inventoryPages = paginateItems(inventoryItems);
+  const invFirstPage = inventoryPages[0];
+  
+  let invFieldName = `Items${diamonds > 0 ? ` + ${formatBid(diamonds)} 💎` : 'None'}`;
+  if (inventoryPages.length > 1) {
+    invFieldName += ` [${invFirstPage.page}/${invFirstPage.totalPages}]`;
+  }
+  
   embed.addFields({ 
-    name: `Items${diamonds > 0 ? ` + ${formatBid(diamonds)} 💎` : 'None'}`,
-    value: itemsText,
+    name: invFieldName,
+    value: invFirstPage.text || 'None',
     inline: true
   });
 
@@ -4225,12 +4269,18 @@ async function getRobloxAvatarUrl(userId) {
         .setFooter({ text: 'Version 1.0.9 | Made By Atlas' })
         .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
-      // Format giveaway items
-      const giveawayItemsText = formatItemsText(giveawayItems);
+      // Paginate giveaway items (15 per page)
+      const giveawayPages = paginateItems(giveawayItems);
+      const giveawayFirstPage = giveawayPages[0];
+      
+      let giveawayFieldName = 'Giveaway Items';
+      if (giveawayPages.length > 1) {
+        giveawayFieldName += ` [${giveawayFirstPage.page}/${giveawayFirstPage.totalPages}]`;
+      }
 
       embed.addFields({
-        name: 'Giveaway Items',
-        value: giveawayItemsText,
+        name: giveawayFieldName,
+        value: giveawayFirstPage.text || 'None',
         inline: false
       });
 
@@ -4356,10 +4406,18 @@ async function getRobloxAvatarUrl(userId) {
               // Winner field
               endEmbed.addFields({ name: 'Winner', value: `**${winner.user}**`, inline: false });
               
-              const itemsText = currentGiveaway.items && currentGiveaway.items.length > 0 ? formatItemsText(currentGiveaway.items) : 'None';
+              // Paginate giveaway items (15 per page)
+              const endGiveawayPages = paginateItems(currentGiveaway.items);
+              const endGiveawayPage = endGiveawayPages[0];
+              
+              let endGiveawayFieldName = 'Giveaway Items';
+              if (endGiveawayPages.length > 1) {
+                endGiveawayFieldName += ` [${endGiveawayPage.page}/${endGiveawayPage.totalPages}]`;
+              }
+              
               endEmbed.addFields({
-                name: 'Giveaway Items',
-                value: itemsText,
+                name: endGiveawayFieldName,
+                value: endGiveawayPage.text || 'None',
                 inline: false
               });
               
@@ -4461,23 +4519,21 @@ async function getRobloxAvatarUrl(userId) {
         .setFooter({ text: 'Version 1.0.9 | Made By Atlas' })
         .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917');
 
-      // Format host items with quantities
-      let hostItemsText = formatItemsText(hostItems);
-      // Ensure field value is not empty and valid
-      if (!hostItemsText || hostItemsText.trim() === '') {
-        hostItemsText = 'None';
-      }
-      // Truncate if too long for Discord embed field (1024 character limit)
-      if (hostItemsText.length > 1020) {
-        hostItemsText = hostItemsText.substring(0, 1017) + '...';
+      // Paginate host items (15 per page)
+      const hostItemsPages = paginateItems(hostItems);
+      const firstPage = hostItemsPages[0];
+      
+      // Format field name with pagination info if needed
+      let fieldName = `Host Items${diamonds > 0 ? ` + ${formatBid(diamonds)} 💎` : ''}`;
+      if (hostItemsPages.length > 1) {
+        fieldName += ` [${firstPage.page}/${firstPage.totalPages}]`;
       }
       
-      const fieldName = `Host Items${diamonds > 0 ? ` + ${formatBid(diamonds)} 💎` : ''}`;
       // Ensure field name is not empty
       if (fieldName && fieldName.trim() !== '') {
         embed.addFields({
           name: fieldName,
-          value: hostItemsText,
+          value: firstPage.text || 'None',
           inline: false
         });
       }
@@ -4843,6 +4899,10 @@ async function updateTradeEmbed(guild, trade, messageId) {
     const message = await channel.messages.fetch(messageId);
     if (!message) return;
 
+    // Paginate host items (15 per page)
+    const hostItemsPages = paginateItems(trade.hostItems);
+    const hostPage = hostItemsPages[0]; // Show first page initially
+    
     // Create embed with grid layout
     const embed = new EmbedBuilder()
       .setTitle('Trade Offer')
@@ -4862,63 +4922,54 @@ async function updateTradeEmbed(guild, trade, messageId) {
       embed.setDescription(`**Status:** Waiting for offers\n\n**Host:** <@${trade.host.id}>`);
     }
 
-    const hostItemsText = formatItemsText(trade.hostItems);
-    // Validate field value
-    let validHostItemsText = hostItemsText;
-    if (!validHostItemsText || validHostItemsText.trim() === '') {
-      validHostItemsText = 'None';
-    }
-    if (validHostItemsText.length > 1020) {
-      validHostItemsText = validHostItemsText.substring(0, 1017) + '...';
+    // Format host items field name with pagination info if needed
+    let hostFieldName = `Host${trade.hostDiamonds > 0 ? ` (+ ${formatBid(trade.hostDiamonds)} 💎)` : ''}`;
+    if (hostItemsPages.length > 1) {
+      hostFieldName += ` [${hostPage.page}/${hostPage.totalPages}]`;
     }
     
-    const hostFieldName = `Host${trade.hostDiamonds > 0 ? ` (+ ${formatBid(trade.hostDiamonds)} 💎)` : ''}`;
     if (hostFieldName && hostFieldName.trim() !== '') {
       embed.addFields({
         name: hostFieldName,
-        value: validHostItemsText,
+        value: hostPage.text || 'None',
         inline: true
       });
     }
 
     if (trade.offers.length > 0 && !trade.accepted) {
       const lastOffer = trade.offers[trade.offers.length - 1];
-      const guestItemsText = formatItemsText(lastOffer.items);
-      // Validate field value
-      let validGuestItemsText = guestItemsText;
-      if (!validGuestItemsText || validGuestItemsText.trim() === '') {
-        validGuestItemsText = 'None';
-      }
-      if (validGuestItemsText.length > 1020) {
-        validGuestItemsText = validGuestItemsText.substring(0, 1017) + '...';
+      // Paginate guest items (15 per page)
+      const guestItemsPages = paginateItems(lastOffer.items);
+      const guestPage = guestItemsPages[0]; // Show first page initially
+      
+      let guestFieldName = `${lastOffer.user.displayName || lastOffer.user.username}${lastOffer.diamonds > 0 ? ` (+ ${formatBid(lastOffer.diamonds)} 💎)` : ''}`;
+      if (guestItemsPages.length > 1) {
+        guestFieldName += ` [${guestPage.page}/${guestPage.totalPages}]`;
       }
       
-      const guestFieldName = `${lastOffer.user.displayName || lastOffer.user.username}${lastOffer.diamonds > 0 ? ` (+ ${formatBid(lastOffer.diamonds)} 💎)` : ''}`;
       if (guestFieldName && guestFieldName.trim() !== '') {
         embed.addFields({
           name: guestFieldName,
-          value: validGuestItemsText,
+          value: guestPage.text || 'None',
           inline: true
         });
       }
     } else if (trade.accepted) {
       const acceptedOffer = trade.offers.find(o => o.user.id === trade.acceptedUser.id);
       if (acceptedOffer) {
-        const guestItemsText = formatItemsText(acceptedOffer.items);
-        // Validate field value
-        let validGuestItemsText = guestItemsText;
-        if (!validGuestItemsText || validGuestItemsText.trim() === '') {
-          validGuestItemsText = 'None';
-        }
-        if (validGuestItemsText.length > 1020) {
-          validGuestItemsText = validGuestItemsText.substring(0, 1017) + '...';
+        // Paginate guest items (15 per page)
+        const guestItemsPages = paginateItems(acceptedOffer.items);
+        const guestPage = guestItemsPages[0]; // Show first page initially
+        
+        let guestFieldName = `${acceptedOffer.user.displayName || acceptedOffer.user.username}${acceptedOffer.diamonds > 0 ? ` (+ ${formatBid(acceptedOffer.diamonds)} 💎)` : ''}`;
+        if (guestItemsPages.length > 1) {
+          guestFieldName += ` [${guestPage.page}/${guestPage.totalPages}]`;
         }
         
-        const guestFieldName = `${acceptedOffer.user.displayName || acceptedOffer.user.username}${acceptedOffer.diamonds > 0 ? ` (+ ${formatBid(acceptedOffer.diamonds)} 💎)` : ''}`;
         if (guestFieldName && guestFieldName.trim() !== '') {
           embed.addFields({
             name: guestFieldName,
-            value: validGuestItemsText,
+            value: guestPage.text || 'None',
             inline: true
           });
         }
