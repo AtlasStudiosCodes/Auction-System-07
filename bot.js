@@ -167,6 +167,65 @@ const MULTIPLE_ERROR_THRESHOLD = 60000; // 60 seconds
 const ALERT_CHANNEL = '1461506733833846958';
 const ALERT_USER = '566300801476329472';
 
+// Item count validation system
+const itemCountTracking = new Map(); // userId -> { offerTradeCount, inventoryCount, giveawayCount, tradeOfferCount, timestamp }
+
+// Function to track item count when added to menu
+function trackItemCount(userId, itemType, count) {
+  if (!itemCountTracking.has(userId)) {
+    itemCountTracking.set(userId, {});
+  }
+  
+  const userTracking = itemCountTracking.get(userId);
+  userTracking[itemType] = count;
+  userTracking.timestamp = Date.now();
+}
+
+// Function to validate item count when sent to embed
+async function validateItemCount(interaction, itemType, receivedCount, itemsList) {
+  const userTracking = itemCountTracking.get(interaction.user.id);
+  
+  if (!userTracking || userTracking[itemType] === undefined) {
+    return true; // First time, no validation needed
+  }
+  
+  const expectedCount = userTracking[itemType];
+  
+  if (receivedCount !== expectedCount) {
+    // CRITICAL ERROR: Item count mismatch
+    const errorEmbed = new EmbedBuilder()
+      .setColor('#FF0000')
+      .setTitle('🚨 CRITICAL ITEM COUNT MISMATCH')
+      .setDescription('**Possible manipulation attempt detected!**')
+      .addFields(
+        { name: '**USER**', value: `${interaction.user.tag} (${interaction.user.id})`, inline: false },
+        { name: '**ITEM TYPE**', value: `\`\`\`${itemType}\`\`\``, inline: true },
+        { name: '**EXPECTED COUNT**', value: `\`\`\`${expectedCount}\`\`\``, inline: true },
+        { name: '**RECEIVED COUNT**', value: `\`\`\`${receivedCount}\`\`\``, inline: true },
+        { name: '**DIFFERENCE**', value: `\`\`\`${receivedCount - expectedCount}\`\`\``, inline: true },
+        { name: '**ITEMS RECEIVED**', value: `\`\`\`${JSON.stringify(itemsList.slice(0, 10)).substring(0, 1024)}\`\`\``, inline: false },
+        { name: '**TIMESTAMP**', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: false },
+        { name: '**GUILD ID**', value: `\`\`\`${interaction.guild.id}\`\`\``, inline: true }
+      );
+    
+    try {
+      const logChannel = await client.channels.fetch(ERROR_LOG_CHANNEL).catch(() => null);
+      if (logChannel) {
+        await logChannel.send({ 
+          content: `<@${ALERT_USER}> **SECURITY ALERT**`,
+          embeds: [errorEmbed] 
+        });
+      }
+    } catch (error) {
+      console.error('Failed to send item count validation error:', error);
+    }
+    
+    return false;
+  }
+  
+  return true;
+}
+
 // Function to log errors to Discord channel
 async function logError(interaction, errorCode, errorMessage, context = {}) {
   try {
@@ -1429,7 +1488,7 @@ client.on('interactionCreate', async (interaction) => {
         // ignore if message not found
       }
       auctions.delete(auction.channelId);
-      interaction.reply({ content: `Auction "${auction.title}" (from ${auction.host}) deleted by admin.`, flags: MessageFlags.Ephemeral });
+      await interaction.reply({ content: `Auction "${auction.title}" (from ${auction.host}) deleted by admin.`, flags: MessageFlags.Ephemeral });
     }
 
     if (commandName === 'endauctionadmin') {
@@ -1445,7 +1504,7 @@ client.on('interactionCreate', async (interaction) => {
       clearInterval(auction.updateInterval);
       const channel = interaction.guild.channels.cache.get(auction.channelId);
       await endAuction(channel);
-      interaction.reply({ content: `Auction "${auction.title}" (from ${auction.host}) ended by admin.`, flags: MessageFlags.Ephemeral });
+      await interaction.reply({ content: `Auction "${auction.title}" (from ${auction.host}) ended by admin.`, flags: MessageFlags.Ephemeral });
     }
 
     if (commandName === 'restartauction') {
@@ -2656,9 +2715,9 @@ client.on('interactionCreate', async (interaction) => {
       });
 
       if (inventory.items.length === 0) {
-        interaction.reply({ content: 'All items deleted from your inventory!', flags: MessageFlags.Ephemeral });
+        await interaction.reply({ content: 'All items deleted from your inventory!', flags: MessageFlags.Ephemeral });
       } else {
-        interaction.reply({ content: `${indicesToDelete.length} item(s) deleted from your inventory!`, flags: MessageFlags.Ephemeral });
+        await interaction.reply({ content: `${indicesToDelete.length} item(s) deleted from your inventory!`, flags: MessageFlags.Ephemeral });
       }
     }
   }
@@ -3879,6 +3938,9 @@ client.on('interactionCreate', async (interaction) => {
         interaction.user.offerTradeItems = [];
       }
       interaction.user.offerTradeItems = interaction.user.offerTradeItems.concat(itemsWithQty);
+      
+      // Track item count for validation
+      trackItemCount(interaction.user.id, 'offerTradeCount', interaction.user.offerTradeItems.length);
 
       // Show option to add more categories or proceed
       const { StringSelectMenuBuilder } = require('discord.js');
@@ -3926,6 +3988,9 @@ client.on('interactionCreate', async (interaction) => {
         interaction.user.inventoryItems = [];
       }
       interaction.user.inventoryItems = interaction.user.inventoryItems.concat(itemsWithQty);
+      
+      // Track item count for validation
+      trackItemCount(interaction.user.id, 'inventoryCount', interaction.user.inventoryItems.length);
 
       const { StringSelectMenuBuilder } = require('discord.js');
       
@@ -3970,6 +4035,9 @@ client.on('interactionCreate', async (interaction) => {
         interaction.user.giveawayItems = [];
       }
       interaction.user.giveawayItems = interaction.user.giveawayItems.concat(itemsWithQty);
+      
+      // Track item count for validation
+      trackItemCount(interaction.user.id, 'giveawayCount', interaction.user.giveawayItems.length);
 
       const { StringSelectMenuBuilder } = require('discord.js');
       
@@ -3995,6 +4063,11 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (interaction.customId === 'inventory_setup_modal') {
+  // Defer the reply to avoid timeout on long operations
+  if (!interaction.deferred && !interaction.replied) {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  }
+
   const diamondsStr = interaction.fields.fields.has('inv_diamonds') ? interaction.fields.getTextInputValue('inv_diamonds') : '0';
   const lookingFor = interaction.fields.getTextInputValue('inv_looking_for') || 'Not specified';
   const robloxInput = interaction.fields.getTextInputValue('inv_roblox_username') || '';
@@ -4017,6 +4090,13 @@ client.on('interactionCreate', async (interaction) => {
   }
 
   const inventoryItems = interaction.user.inventoryItems || [];
+  
+  // Validate item count before finalizing
+  const isValid = await validateItemCount(interaction, 'inventoryCount', inventoryItems.length, inventoryItems);
+  if (!isValid) {
+    return sendErrorReply(interaction, 'E50', 'Item count validation failed. Please try again.');
+  }
+  
   delete interaction.user.inventoryItems;
   // ... (rest of your deletes)
 
@@ -4096,7 +4176,20 @@ client.on('interactionCreate', async (interaction) => {
 
   const row = new ActionRowBuilder().addComponents(updateButton, deleteButton);
   const targetChannel = redirectInventoryChannelId ? interaction.guild.channels.cache.get(redirectInventoryChannelId) : interaction.channel;
-  const message = await targetChannel.send({ embeds: [embed], components: [row] });
+  
+  let message;
+  if (interaction.deferred) {
+    // If we deferred earlier, use editReply for the deferred response
+    const ephemeralMessage = await interaction.editReply({ embeds: [embed], components: [row] });
+    // Send a public copy to the target channel if different from current channel
+    if (targetChannel.id !== interaction.channel.id) {
+      message = await targetChannel.send({ embeds: [embed], components: [row] });
+    } else {
+      message = ephemeralMessage;
+    }
+  } else {
+    message = await targetChannel.send({ embeds: [embed], components: [row] });
+  }
 
   // Salvar dados
   const inventoryData = {
@@ -4178,9 +4271,20 @@ async function getRobloxAvatarUrl(userId) {
 }
   
     if (interaction.customId === 'giveaway_setup_modal') {
+      // Defer the reply to avoid timeout on long operations
+      if (!interaction.deferred && !interaction.replied) {
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      }
+
       const giveawayItems = interaction.user.giveawayItems || [];
       const description = interaction.fields.getTextInputValue('gwa_description') || '';
       const durationStr = interaction.fields.getTextInputValue('gwa_duration');
+      
+      // Validate item count before finalizing
+      const isValid = await validateItemCount(interaction, 'giveawayCount', giveawayItems.length, giveawayItems);
+      if (!isValid) {
+        return sendErrorReply(interaction, 'E50', 'Item count validation failed. Please try again.');
+      }
       
       // Validate duration
       let duration = parseDuration(durationStr);
@@ -4412,7 +4516,11 @@ async function getRobloxAvatarUrl(userId) {
       
       giveawayData.updateInterval = updateInterval;
 
-      await interaction.reply({ content: replyMessage, flags: 64 });
+      if (interaction.deferred) {
+        await interaction.editReply({ content: replyMessage });
+      } else {
+        await interaction.reply({ content: replyMessage, flags: 64 });
+      }
       return;
     }
 
@@ -4486,6 +4594,11 @@ async function getRobloxAvatarUrl(userId) {
     }
 
     if (interaction.customId.startsWith('offer_submit_modal_')) {
+      // Defer the reply to avoid timeout on long operations
+      if (!interaction.deferred && !interaction.replied) {
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      }
+
       const messageId = interaction.customId.replace('offer_submit_modal_', '');
       const diamondsStr = interaction.fields.getTextInputValue('offer_diamonds') || '0';
 
@@ -4495,6 +4608,13 @@ async function getRobloxAvatarUrl(userId) {
       }
 
       const offerItems = interaction.user.offerItems || [];
+      
+      // Validate item count before finalizing
+      const isValid = await validateItemCount(interaction, 'offerTradeCount', offerItems.length, offerItems);
+      if (!isValid) {
+        return sendErrorReply(interaction, 'E50', 'Item count validation failed. Please try again.');
+      }
+      
       delete interaction.user.offerItems;
       delete interaction.user.messageId;
 
@@ -4523,7 +4643,11 @@ async function getRobloxAvatarUrl(userId) {
         await channel.send(`📢 <@${trade.host.id}>, you received an offer from <@${interaction.user.id}>!`);
       }
 
-      await interaction.reply({ content: `Offer submitted! Host will accept or decline.`, flags: 64 });
+      if (interaction.deferred) {
+        await interaction.editReply({ content: `Offer submitted! Host will accept or decline.` });
+      } else {
+        await interaction.reply({ content: `Offer submitted! Host will accept or decline.`, flags: 64 });
+      }
       return;
     }
 
@@ -4559,7 +4683,7 @@ async function getRobloxAvatarUrl(userId) {
       if (auction.model !== 'items' && diamonds <= maxBid) return sendErrorReply(interaction, 'E79', `Your bid must be higher than the current highest bid of ${formatBid(maxBid)} 💎`);
 
       auction.bids.push({ user: interaction.user, diamonds, items, timestamp: Date.now() });
-      interaction.reply(`Bid placed: ${diamonds > 0 ? `${formatBid(diamonds)} 💎` : ''}${items ? ` and ${items}` : ''}`);
+      await interaction.reply(`Bid placed: ${diamonds > 0 ? `${formatBid(diamonds)} 💎` : ''}${items ? ` and ${items}` : ''}`);
     }
 
     if (interaction.customId === 'auction_modal') {
