@@ -167,7 +167,7 @@ async function logError(interaction, errorCode, errorMessage, context = {}) {
     const embed = new EmbedBuilder()
       .setColor(embedColor)
       .setTitle('⚠️ Error Report') //embed thumbnail
-      .setThumbnail('https://media.discordapp.net/attachments/1461378333278470259/1461514275976773674/B2087062-9645-47D0-8918-A19815D8E6D8.png?ex=696ad4bd&is=6969833d&hm=2f262b12ac860c8d92f40789893fda4f1ea6289bc5eb114c211950700eb69a79&=&format=webp&quality=lossless&width=1376&height=917')
+      .setThumbnail('https://media.discordapp.net/attachments/1461506733833846958/1462815885806014465/75e6b309-4e2b-48c6-9046-23df37b6c836.gif?ex=696f90f4&is=696e3f74&hm=61a2feb6bb88c81231141bdd77d1be122b01aad030d4c0927904666015966d4e&=&width=1006&height=1006')
       .addFields(
         { name: 'User', value: `${interaction.user.tag} (${interaction.user.id})`, inline: true },
         { name: 'Error Code', value: `\`${errorCode}\``, inline: true },
