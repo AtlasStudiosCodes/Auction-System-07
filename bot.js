@@ -543,6 +543,27 @@ function formatItemsList(items) {
   }).join('\n');
 }
 
+// Helper function to add fields safely to embed (prevents invalid fields)
+function addFieldSafely(embed, name, value, inline = false) {
+  // Validate field
+  if (!name || name.toString().trim() === '') return false;
+  if (!value || value.toString().trim() === '') {
+    value = 'None';
+  }
+  
+  // Ensure value is a string and limit to 1024 chars
+  value = value.toString().substring(0, 1024);
+  name = name.toString().substring(0, 256);
+  
+  try {
+    embed.addFields({ name, value, inline });
+    return true;
+  } catch (error) {
+    console.error('Error adding field to embed:', { name, value, error: error.message });
+    return false;
+  }
+}
+
 // Helper function to create standard embed footer and thumbnail
 function getStandardEmbedFooter() {
   return {
@@ -2170,23 +2191,11 @@ client.on('interactionCreate', async (interaction) => {
 
             const giveawayItemsText = formatItemsText(giveaway.items);
 
-            endedEmbed.addFields({
-              name: 'Giveaway Items',
-              value: giveawayItemsText,
-              inline: false
-            });
+            addFieldSafely(endedEmbed, 'Giveaway Items', giveawayItemsText, false);
 
-            endedEmbed.addFields({
-              name: 'Hosted by',
-              value: giveaway.host.toString(),
-              inline: false
-            });
+            addFieldSafely(endedEmbed, 'Hosted by', giveaway.host.toString(), false);
 
-            endedEmbed.addFields({
-              name: 'Status',
-              value: 'Ended by host',
-              inline: false
-            });
+            addFieldSafely(endedEmbed, 'Status', 'Ended by host', false);
 
             // Disable all buttons
             const disabledRow = new ActionRowBuilder().addComponents(
@@ -2233,21 +2242,13 @@ client.on('interactionCreate', async (interaction) => {
         .setFooter({ text: 'Version 1.0.9 | Made By Atlas' });
 
       // Winner field
-      embed.addFields({ name: 'Winner', value: `**${winner.user}**`, inline: false });
+      addFieldSafely(embed, 'Winner', `**${winner.user}**`, false);
 
       // List items with proper formatting (bold + abbrev for diamonds)
       const itemsText = giveaway.items && giveaway.items.length > 0 ? formatItemsText(giveaway.items) : 'None';
-      embed.addFields({
-        name: 'Giveaway Items',
-        value: itemsText,
-        inline: false
-      });
+      addFieldSafely(embed, 'Giveaway Items', itemsText, false);
 
-      embed.addFields({
-        name: 'Total Entries',
-        value: giveaway.entries.length.toString(),
-        inline: true
-      });
+      addFieldSafely(embed, 'Total Entries', giveaway.entries.length.toString(), true);
 
       // Add Upload Proof Image button
       const proofButton = new ButtonBuilder()
@@ -4149,19 +4150,19 @@ client.on('interactionCreate', async (interaction) => {
 
   // Rest of embed filling...
   const itemsText = formatItemsText(inventoryItems);
-  embed.addFields({ 
-    name: `Items${diamonds > 0 ? ` + ${formatBid(diamonds)} 💎` : 'None'}`,
-    value: itemsText,
-    inline: true
-  });
+  addFieldSafely(embed,
+    `Items${diamonds > 0 ? ` + ${formatBid(diamonds)} 💎` : 'None'}`,
+    itemsText,
+    false
+  );
 
-  embed.addFields({ name: 'Looking For', value: lookingFor, inline: true });
+  addFieldSafely(embed, 'Looking For', lookingFor, true);
 
   const now = new Date();
   // Adjust to GMT-5 (UTC-5)
   const gmt5Time = new Date(now.getTime() - (5 * 60 * 60 * 1000));
   const timeStr = `${gmt5Time.getDate()}/${gmt5Time.getMonth() + 1}/${gmt5Time.getFullYear()} at ${gmt5Time.getHours().toString().padStart(2, '0')}:${gmt5Time.getMinutes().toString().padStart(2, '0')}`;
-  embed.addFields({ name: 'Last Edited', value: timeStr, inline: false });
+  addFieldSafely(embed, 'Last Edited', timeStr, false);
 
   // Buttons and sending...
   const updateButton = new ButtonBuilder()
@@ -4310,33 +4311,20 @@ async function getRobloxAvatarUrl(userId) {
       // Format giveaway items
       const giveawayItemsText = formatItemsText(giveawayItems);
 
-      embed.addFields({
-        name: 'Giveaway Items',
-        value: giveawayItemsText,
-        inline: false
-      });
+      addFieldSafely(embed, 'Giveaway Items', giveawayItemsText, false);
 
-      embed.addFields({
-        name: 'Hosted by',
-        value: interaction.user.toString(),
-        inline: false
-      });
+      addFieldSafely(embed, 'Hosted by', interaction.user.toString(), false);
 
       // Add creator description if provided
       if (description) {
-        embed.addFields({
-          name: 'Description',
-          value: description,
-          inline: false
-        });
+        addFieldSafely(embed, 'Description',
+          description,
+        false
+        );
       }
 
       // Add duration field
-      embed.addFields({
-        name: 'Time Remaining',
-        value: 'Calculating...',
-        inline: false
-      });
+      addFieldSafely(embed, 'Time Remaining', 'Calculating...', false);
 
       // Calculate duration text for the reply message
       const durationHours = Math.floor(duration / 60);
@@ -4436,20 +4424,12 @@ async function getRobloxAvatarUrl(userId) {
                 .setFooter({ text: 'Version 1.0.9 | Made By Atlas' });
               
               // Winner field
-              endEmbed.addFields({ name: 'Winner', value: `**${winner.user}**`, inline: false });
+              addFieldSafely(endEmbed, 'Winner', `**${winner.user}**`, false);
               
               const itemsText = currentGiveaway.items && currentGiveaway.items.length > 0 ? formatItemsText(currentGiveaway.items) : 'None';
-              endEmbed.addFields({
-                name: 'Giveaway Items',
-                value: itemsText,
-                inline: false
-              });
+              addFieldSafely(endEmbed, 'Giveaway Items', itemsText, false);
               
-              endEmbed.addFields({
-                name: 'Total Entries',
-                value: currentGiveaway.entries.length.toString(),
-                inline: true
-              });
+              addFieldSafely(endEmbed, 'Total Entries', currentGiveaway.entries.length.toString(), true);
               
               const channel = interaction.guild.channels.cache.get(currentGiveaway.channelId);
               if (channel) {
@@ -4470,23 +4450,11 @@ async function getRobloxAvatarUrl(userId) {
           
           const giveawayItemsText = formatItemsText(currentGiveaway.items);
           
-          updatedEmbed.addFields({
-            name: 'Giveaway Items',
-            value: giveawayItemsText,
-            inline: false
-          });
+          addFieldSafely(updatedEmbed, 'Giveaway Items', giveawayItemsText, false);
           
-          updatedEmbed.addFields({
-            name: 'Hosted by',
-            value: currentGiveaway.host.toString(),
-            inline: false
-          });
+          addFieldSafely(updatedEmbed, 'Hosted by', currentGiveaway.host.toString(), false);
           
-          updatedEmbed.addFields({
-            name: 'Time Remaining',
-            value: formatTimeRemaining(currentGiveaway.expiresAt),
-            inline: false
-          });
+          addFieldSafely(updatedEmbed, 'Time Remaining', formatTimeRemaining(currentGiveaway.expiresAt), false);
           
           // Update components with new entries count
           const entriesCount = currentGiveaway.entries.length;
@@ -4550,11 +4518,11 @@ async function getRobloxAvatarUrl(userId) {
       // Format host items with quantities
       const hostItemsText = formatItemsText(hostItems);
       
-      embed.addFields({
-        name: `Host Items${diamonds > 0 ? ` + ${formatBid(diamonds)} 💎` : ''}`,
-        value: hostItemsText,
-        inline: false
-      });
+      addFieldSafely(embed, 
+        `Host Items${diamonds > 0 ? ` + ${formatBid(diamonds)} 💎` : ''}`,
+        hostItemsText,
+        false
+      );
 
       const offerButton = new ButtonBuilder()
         .setCustomId('trade_offer_button')
@@ -4950,29 +4918,29 @@ async function updateTradeEmbed(guild, trade, messageId) {
     }
 
     const hostItemsText = formatItemsText(trade.hostItems);
-    embed.addFields({
-      name: `Host${trade.hostDiamonds > 0 ? ` (+ ${formatBid(trade.hostDiamonds)} 💎)` : ''}`,
-      value: hostItemsText,
-      inline: true
-    });
+    addFieldSafely(embed,
+      `Host${trade.hostDiamonds > 0 ? ` (+ ${formatBid(trade.hostDiamonds)} 💎)` : ''}`,
+      hostItemsText,
+      true
+    );
 
     if (trade.offers.length > 0 && !trade.accepted) {
       const lastOffer = trade.offers[trade.offers.length - 1];
       const guestItemsText = formatItemsText(lastOffer.items);
-      embed.addFields({
-        name: `${lastOffer.user.displayName || lastOffer.user.username}${lastOffer.diamonds > 0 ? ` (+ ${formatBid(lastOffer.diamonds)} 💎)` : ''}`,
-        value: guestItemsText,
-        inline: true
-      });
+      addFieldSafely(embed,
+        `${lastOffer.user.displayName || lastOffer.user.username}${lastOffer.diamonds > 0 ? ` (+ ${formatBid(lastOffer.diamonds)} 💎)` : ''}`,
+        guestItemsText,
+        true
+      );
     } else if (trade.accepted) {
       const acceptedOffer = trade.offers.find(o => o.user.id === trade.acceptedUser.id);
       if (acceptedOffer) {
         const guestItemsText = formatItemsText(acceptedOffer.items);
-        embed.addFields({
-          name: `${acceptedOffer.user.displayName || acceptedOffer.user.username}${acceptedOffer.diamonds > 0 ? ` (+ ${formatBid(acceptedOffer.diamonds)} 💎)` : ''}`,
-          value: guestItemsText,
-          inline: true
-        });
+        addFieldSafely(embed,
+          `${acceptedOffer.user.displayName || acceptedOffer.user.username}${acceptedOffer.diamonds > 0 ? ` (+ ${formatBid(acceptedOffer.diamonds)} 💎)` : ''}`,
+          guestItemsText,
+          true
+        );
       }
     }
 
