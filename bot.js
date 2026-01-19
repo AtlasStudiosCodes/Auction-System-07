@@ -1916,7 +1916,7 @@ client.on('interactionCreate', async (interaction) => {
        const end = start + ITEMS_PER_PAGE;
        const pageItems = interaction.user.tradeItems.slice(start, end);
        const itemsList = formatItemsList(pageItems);                                         //\nWhat would you like to do?
-       const description = `**Selected Items (Page ${newPage}/${totalPages}):**\n${itemsList}\n`;
+       const description = `**Selected Items (Page ${newPage}/${totalPages}):**\n${itemsList}\n\nWhat would you like to do?`;
 
        const embed = new EmbedBuilder().setDescription(description);
 
@@ -1957,7 +1957,7 @@ client.on('interactionCreate', async (interaction) => {
       const end = start + ITEMS_PER_PAGE;
       const pageItems = interaction.user.inventoryItems.slice(start, end);
       const itemsList = formatItemsList(pageItems);                                         //\nWhat would you like to do?
-      const description = `**Selected Items (Page ${newPage}/${totalPages}):**\n${itemsList}\n`;
+      const description = `**Selected Items (Page ${newPage}/${totalPages}):**\n${itemsList}\n\nWhat would you like to do?`;
 
       const embed = new EmbedBuilder().setDescription(description);
 
@@ -2000,7 +2000,7 @@ client.on('interactionCreate', async (interaction) => {
       const end = start + ITEMS_PER_PAGE;
       const pageItems = interaction.user.giveawayItems.slice(start, end);
       const itemsList = formatItemsList(pageItems);
-      const description = `**Selected Items (Page ${newPage}/${totalPages}):**\n${itemsList}\n`;
+      const description = `**Selected Items (Page ${newPage}/${totalPages}):**\n${itemsList}\n\nWhat would you like to do?`;
 
       const embed = new EmbedBuilder().setDescription(description);
 
@@ -2045,7 +2045,7 @@ client.on('interactionCreate', async (interaction) => {
       const end = start + ITEMS_PER_PAGE;
       const pageItems = interaction.user.offerTradeItems.slice(start, end);
       const itemsList = formatItemsList(pageItems);
-      const description = `**Selected Items (Page ${newPage}/${totalPages}):**\n${itemsList}\n`;
+      const description = `**Selected Items (Page ${newPage}/${totalPages}):**\n${itemsList}\n\nWhat would you like to do?`;
 
       const embed = new EmbedBuilder().setDescription(description);
 
@@ -3562,7 +3562,7 @@ client.on('interactionCreate', async (interaction) => {
       const end = start + ITEMS_PER_PAGE;
       const pageItems = interaction.user.tradeItems.slice(start, end);
       const itemsList = formatItemsList(pageItems);                                             //\nWhat would you like to do?
-      const description = `**Selected Items (Page ${currentPage}/${totalPages}):**\n${itemsList}\n`;
+      const description = `**Selected Items (Page ${currentPage}/${totalPages}):**\n${itemsList}\n\nWhat would you like to do?`;
 
       await interaction.reply({ 
         content: description,
@@ -3617,7 +3617,7 @@ client.on('interactionCreate', async (interaction) => {
       const end = start + ITEMS_PER_PAGE;
       const pageItems = interaction.user.offerTradeItems.slice(start, end);
       const itemsList = formatItemsList(pageItems);                                             //\nWhat would you like to do?
-      const description = `**Selected Items (Page ${currentPage}/${totalPages}):**\n${itemsList}\n`;
+      const description = `**Selected Items (Page ${currentPage}/${totalPages}):**\n${itemsList}\n\nWhat would you like to do?`;
 
       const embed = new EmbedBuilder().setDescription(description);
       const components = [row];
@@ -3682,7 +3682,7 @@ client.on('interactionCreate', async (interaction) => {
       const end = start + ITEMS_PER_PAGE;
       const pageItems = interaction.user.inventoryItems.slice(start, end);
       const itemsList = formatItemsList(pageItems);                                             //\nWhat would you like to do?
-      const description = `**Selected Items (Page ${currentPage}/${totalPages}):**\n${itemsList}\n`;
+      const description = `**Selected Items (Page ${currentPage}/${totalPages}):**\n${itemsList}\n\nWhat would you like to do?`;
 
       const embed = new EmbedBuilder().setDescription(description);
       const components = [row];
@@ -3744,7 +3744,7 @@ client.on('interactionCreate', async (interaction) => {
       const end = start + ITEMS_PER_PAGE;
       const pageItems = interaction.user.giveawayItems.slice(start, end);
       const itemsList = formatItemsList(pageItems);                                             //\nWhat would you like to do?
-      const description = `**Selected Items (Page ${currentPage}/${totalPages}):**\n${itemsList}\n`;
+      const description = `**Selected Items (Page ${currentPage}/${totalPages}):**\n${itemsList}\n\nWhat would you like to do?`;
 
       const embed = new EmbedBuilder().setDescription(description);
       const components = [row];
