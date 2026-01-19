@@ -179,7 +179,6 @@ async function logError(interaction, errorCode, errorMessage, context = {}) {
       .addFields(
         { name: 'User', value: `${interaction.user.tag} (${interaction.user.id})`, inline: true },
         { name: 'Error Code', value: `\`${errorCode}\``, inline: true },
-        { name: 'Description', value: ERROR_CODES[errorCode] || 'Unknown error', inline: false },
         { name: 'Message', value: errorMessage || 'No additional info', inline: false },
         { name: 'Timestamp', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: false }
       );
